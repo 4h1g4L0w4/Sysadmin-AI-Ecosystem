@@ -1,0 +1,43 @@
+# ─── Claves SSH (NUNCA commiteár) ───
+ssh-keys/
+*.pem
+*.key
+*.p12
+*.pfx
+id_*
+*.pub
+
+# ─── Dependencias ───
+node_modules/
+.opencode/node_modules/
+
+# ─── Archivos generados por opencode ───
+.opencode/package.json
+.opencode/package-lock.json
+
+# ─── Memoria local (contenido dinámico, no código fuente) ───
+memoria/hosts/*
+memoria/incidentes/*
+!memoria/hosts/.gitkeep
+!memoria/incidentes/.gitkeep
+
+# ─── Sistema operativo ───
+.DS_Store
+.DS_Store?
+ehthumbs.db
+Thumbs.db
+
+# ─── Editor / IDE ───
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-*
+
+# ─── Logs ───
+*.log
+
+# ─── Entorno ───
+.env
+.env.*
