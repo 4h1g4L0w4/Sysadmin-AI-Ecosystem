@@ -10,8 +10,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/Tools-6-7C3AED?style=flat-square">
-  <img src="https://img.shields.io/badge/Skills-2-22C55E?style=flat-square">
+  <img src="https://img.shields.io/badge/Tools-7-7C3AED?style=flat-square">
+  <img src="https://img.shields.io/badge/Skills-1-22C55E?style=flat-square">
   <img src="https://img.shields.io/badge/Powered%20by-OpenCode-FF6B35?style=flat-square">
 </p>
 
@@ -28,6 +28,7 @@
   - [docker-debug](#-docker-debug)
   - [network-debug](#-network-debug)
   - [ssl-check](#-ssl-check)
+  - [digifort](#-digifort)
 - [Memoria Persistente](#-memoria-persistente)
 - [Flujo de Trabajo](#-flujo-de-trabajo)
 - [Instalación](#-instalación)
@@ -49,6 +50,7 @@
 - 🐳 Inspeccionar contenedores Docker y orquestación Kubernetes
 - 🌐 Analizar problemas de conectividad y red
 - 🔐 Verificar certificados SSL/TLS
+- 📹 Consultar servidores Digifort (NVR) — uso, cámaras, estado de grabación
 - 🧠 Mantener **memoria persistente** de cada servidor e incidentes
 
 Todo **read-only** y **sin sudo** — seguro para entornos de producción.
@@ -60,6 +62,7 @@ Todo **read-only** y **sin sudo** — seguro para entornos de producción.
 ```
 sysadmin-ai-ecosystem/
 ├── AGENTS.md                      ← Reglas de selección automática de tools
+├── .env.example                   ← Template de credenciales (Digifort)
 ├── ssh-keys/                      ← Claves SSH (auto-detectadas)
 │   ├── id_ed25519
 │   └── id_ed25519.pub
@@ -74,9 +77,10 @@ sysadmin-ai-ecosystem/
     │   ├── docker-debug.ts
     │   ├── k8s-debug.ts
     │   ├── network-debug.ts
-    │   └── ssl-check.ts
+    │   ├── ssl-check.ts
+    │   └── digifort.ts            ← HTTP directo (sin SSH)
     └── skills/
-        └── memoria/
+        └── host-memory/
             └── SKILL.md           ← Skill de gestión de memoria
 ```
 
@@ -186,6 +190,25 @@ Verificación de certificados SSL/TLS.
 
 **Salida:** Fechas, subject, issuer, serial, fingerprint SHA-256, SANs, chain, verificación, ventanas de expiración (30/90 días), soporte TLS 1.2 y 1.3.
 
+### 📹 digifort
+
+Consulta el estado de un servidor Digifort (NVR) vía HTTP directo (no SSH). Lee credenciales de `.env` (`DIGIFORT_USER`, `DIGIFORT_PASS`) o permite pasarlas por parámetro.
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `host` | `string` | IP del servidor Digifort |
+| `port` | `number?` | Puerto HTTP (8601) |
+| `username` | `string?` | Usuario (default: DIGIFORT_USER del .env) |
+| `password` | `string?` | Password (default: DIGIFORT_PASS del .env) |
+| `action` | `string?` | `usage`, `cameras`, `cameras-status`, `all` (default) |
+| `filter` | `string?` | Filtro por nombre/IP/descripción de cámara |
+
+**Salida:**
+- **usage** — CPU, memoria, tráfico, conexiones activas del servidor
+- **cameras** — listado con nombre, IP, puerto y estado activa/inactiva
+- **cameras-status** — estado de grabación: ok/falla, uptime, horas de grabación, disco usado
+- **filter** — sin filter muestra solo cantidad + 5; con filter, todas las coincidencias
+
 ---
 
 ## 🧠 Memoria Persistente
@@ -226,7 +249,7 @@ graph TD
     B -->|Sí| D[Leer memoria/hosts/]
     C --> E{Aplicar tool según problema}
     D --> E
-    E --> F[debug / docker-debug / k8s-debug / network-debug / ssl-check]
+    E --> F[debug / docker-debug / k8s-debug / network-debug / ssl-check / digifort]
     F --> G[Actualizar memoria/hosts/]
     F --> H{Problema resuelto?}
     H -->|Sí| I[Crear incidente en memoria/incidentes/]
@@ -246,6 +269,7 @@ graph TD
   ```bash
   eval $(ssh-agent) && ssh-add ~/.ssh/id_ed25519
   ```
+- **Opcional**: Archivo `.env` con `DIGIFORT_USER` y `DIGIFORT_PASS` para la tool `digifort`
 - **Opcional**: `sshpass` para autenticación por password:
   ```bash
   sudo apt install sshpass   # Debian/Ubuntu
@@ -259,6 +283,9 @@ git clone <repo-url> && cd sysadmin-ai-ecosystem
 
 # Poner tus claves SSH
 cp ~/.ssh/id_ed25519 ssh-keys/
+
+# Configurar credenciales Digifort (opcional)
+cp .env.example .env   # y editá DIGIFORT_USER / DIGIFORT_PASS
 
 # Abrir opencode
 opencode
@@ -276,6 +303,8 @@ opencode
 | *"no llego desde el server web1 a la API en api.internal:443"* | `network-debug(host: "web1", target: "api.internal", targetPort: 443)` |
 | *"verificá el certificado de ejemplo.com desde el server proxy1"* | `ssl-check(host: "proxy1", target: "ejemplo.com")` |
 | *"los pods en producción están reiniciando"* | `k8s-debug(host: "master1", namespace: "prod")` |
+| *"cómo está el NVR 10.10.10.10"* | `digifort(host: "10.10.10.10")` → usage + cameras + status |
+| *"mostrame solo la cámara de la entrada"* | `digifort(host: "10.10.10.10", action: "cameras", filter: "entrada")` |
 
 ---
 
@@ -283,12 +312,13 @@ opencode
 
 | Skill | Descripción |
 |-------|-------------|
-| [memoria](.opencode/skills/memoria/SKILL.md) | Instrucciones para que la IA lea/actualice `memoria/hosts/` y registre incidentes automáticamente |
+| [host-memory](.opencode/skills/host-memory/SKILL.md) | Instrucciones para que la IA lea/actualice `memoria/hosts/` y registre incidentes automáticamente |
 
 ---
 
 ## 🗺️ Roadmap
 
+- [x] **`digifort`** — consulta de servidores Digifort NVR (uso, cámaras, estado de grabación)
 - [ ] **`db-query`** — consultas SQL read-only a PostgreSQL/MySQL
 - [ ] **`ansible-run`** — ejecución de playbooks Ansible para remediación
 - [ ] **`prometheus-mcp`** — integración con Prometheus para métricas
