@@ -14,6 +14,7 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 | "SSL" / "certificado" / "HTTPS" / "vencimiento" / "TLS" | **ssl-check** |
 | "Digifort" / "NVR" / "cámaras" / "servidor de video" / "GetUsage" / "GetCameras" | **digifort** |
 | "auditá la seguridad" / "Lynis" / "vulnerabilidades" / "hardening" / "security audit" / "CIS" | **security-audit** |
+| "actualizaciones" / "paquetes" / "upgrade" / "atrasado" / "parches" / "patch" / "qué updates hay pendientes" | **patch-status** |
 
 ## Flujo de trabajo
 

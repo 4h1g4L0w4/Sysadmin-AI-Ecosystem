@@ -10,8 +10,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/Tools-8-7C3AED?style=flat-square">
-  <img src="https://img.shields.io/badge/Skills-1-22C55E?style=flat-square">
+  <img src="https://img.shields.io/badge/Tools-9-7C3AED?style=flat-square">
+  <img src="https://img.shields.io/badge/Skills-3-22C55E?style=flat-square">
   <img src="https://img.shields.io/badge/Powered%20by-OpenCode-FF6B35?style=flat-square">
 </p>
 
@@ -30,6 +30,7 @@
   - [ssl-check](#-ssl-check)
   - [digifort](#-digifort)
   - [security-audit](#-security-audit)
+  - [patch-status](#-patch-status)
 - [Memoria Persistente](#-memoria-persistente)
 - [Flujo de Trabajo](#-flujo-de-trabajo)
 - [Instalación](#-instalación)
@@ -53,6 +54,7 @@
 - 🔐 Verificar certificados SSL/TLS
 - 📹 Consultar servidores Digifort (NVR) — uso, cámaras, estado de grabación
 - 🛡️ Auditar seguridad con Lynis — hardening index, warnings, suggestions
+- 📦 Estado de parches y actualizaciones — paquetes pendientes, seguridad, compatibilidad
 - 🧠 Mantener **memoria persistente** de cada servidor e incidentes
 
 Todo **read-only** y **sin sudo** — seguro para entornos de producción.
@@ -81,7 +83,8 @@ sysadmin-ai-ecosystem/
     │   ├── network-debug.ts
     │   ├── ssl-check.ts
     │   ├── digifort.ts            ← HTTP directo (sin SSH)
-    │   └── security-audit.ts      ← Lynis security audit
+    │   ├── security-audit.ts      ← Lynis security audit
+    │   └── patch-status.ts        ← Package updates status
     └── skills/
         └── host-memory/
             └── SKILL.md           ← Skill de gestión de memoria
@@ -227,6 +230,22 @@ Ejecuta Lynis security audit en el servidor remoto. Descarga Lynis a `/tmp` si n
 **Salida (quick):** Hardening Index, cantidad de warnings/suggestions, top 10 de cada uno.
 **Salida (full):** Reporte Lynis completo (formato key=value).
 
+### 📦 patch-status
+
+Estado de parches y actualizaciones del servidor. Detecta apt (Debian/Ubuntu), dnf (Fedora/RHEL) y yum (CentOS 7).
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `host` | `string` | Servidor remoto |
+| `port` | `number?` | Puerto SSH (22) |
+| `username` | `string?` | Usuario SSH |
+| `identityFile` | `string?` | Clave SSH (auto-detectada) |
+| `mode` | `string?` | `summary` (default), `full`, `security` |
+
+**Salida (summary):** OS y package manager, total updates (security vs regular), reboot pending, paquetes que se eliminarían, held/orphaned, top 10 security updates.
+**Salida (full):** Listado completo de paquetes upgradables, simulated dist-upgrade, held, orphaned.
+**Salida (security):** Solo los paquetes con update de seguridad.
+
 ---
 
 ## 🧠 Memoria Persistente
@@ -267,7 +286,7 @@ graph TD
     B -->|Sí| D[Leer memoria/hosts/]
     C --> E{Aplicar tool según problema}
     D --> E
-    E --> F[debug / docker-debug / k8s-debug / network-debug / ssl-check / digifort / security-audit]
+    E --> F[debug / docker-debug / k8s-debug / network-debug / ssl-check / digifort / security-audit / patch-status]
     F --> G[Actualizar memoria/hosts/]
     F --> H{Problema resuelto?}
     H -->|Sí| I[Crear incidente en memoria/incidentes/]
@@ -325,6 +344,8 @@ opencode
 | *"mostrame solo la cámara de la entrada"* | `digifort(host: "10.10.10.10", action: "cameras", filter: "entrada")` |
 | *"auditá la seguridad del server 10.0.0.5"* | `security-audit(host: "10.0.0.5")` → hardening index + warnings + suggestions |
 | *"dame el reporte completo de lynis del server db1"* | `security-audit(host: "db1", mode: "full")` |
+| *"qué updates hay pendientes en el server web1"* | `patch-status(host: "web1")` → resumen + security |
+| *"mostrame solo los security updates del server app1"* | `patch-status(host: "app1", mode: "security")` |
 
 ---
 
@@ -333,6 +354,8 @@ opencode
 | Skill | Descripción |
 |-------|-------------|
 | [host-memory](.opencode/skills/host-memory/SKILL.md) | Instrucciones para que la IA lea/actualice `memoria/hosts/` y registre incidentes automáticamente |
+| [security-audit](.opencode/skills/security-audit/SKILL.md) | Cuándo y cómo ejecutar auditorías Lynis, interpretar resultados, persistir hallazgos |
+| [patch-status](.opencode/skills/patch-status/SKILL.md) | Evaluación de actualizaciones pendientes, compatibilidad y riesgos de upgrade |
 
 ---
 
@@ -340,6 +363,7 @@ opencode
 
 - [x] **`digifort`** — consulta de servidores Digifort NVR (uso, cámaras, estado de grabación)
 - [x] **`security-audit`** — auditoría de seguridad con Lynis
+- [x] **`patch-status`** — estado de parches y actualizaciones
 - [ ] **`db-query`** — consultas SQL read-only a PostgreSQL/MySQL
 - [ ] **`ansible-run`** — ejecución de playbooks Ansible para remediación
 - [ ] **`prometheus-mcp`** — integración con Prometheus para métricas
