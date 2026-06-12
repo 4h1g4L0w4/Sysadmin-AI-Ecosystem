@@ -12,6 +12,7 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 | "Kubernetes" / "k8s" / "pods" / "cluster" / "deployment X" | **k8s-debug** |
 | "conectividad" / "red" / "no llega" / "ping" / "DNS" / "traceroute" / "firewall" | **network-debug** |
 | "SSL" / "certificado" / "HTTPS" / "vencimiento" / "TLS" | **ssl-check** |
+| "Digifort" / "NVR" / "cámaras" / "servidor de video" / "GetUsage" / "GetCameras" | **digifort** |
 
 ## Flujo de trabajo
 
@@ -21,6 +22,12 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 4. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
 5. **Siempre** al finalizar, actualizá `./memoria/hosts/<host>.md` con los hallazgos.
 6. **Si resolviste un problema** → creá `./memoria/incidentes/YYYY-MM-DD-desc.md`.
+
+## Configuración de credenciales
+
+- Las credentials de Digifort se leen del archivo `.env` en la raíz del proyecto, con las variables `DIGIFORT_USER` y `DIGIFORT_PASS`.
+- Usá el `.env.example` como plantilla.
+- El usuario puede sobreescribirlas pasando `username`/`password` directamente a la tool `digifort`.
 
 ## Recursos del proyecto
 

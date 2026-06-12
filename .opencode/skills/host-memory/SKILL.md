@@ -17,7 +17,7 @@ description: Gestión de memoria persistente por host. Antes de conectar a un se
 
 ## Flujo obligatorio
 
-### 1. ANTES de ejecutar debug/recon/k8s-debug/docker-debug/network-debug/ssl-check
+### 1. ANTES de ejecutar debug/recon/k8s-debug/docker-debug/network-debug/ssl-check/digifort
 
 Leé `./memoria/hosts/<host>.md` si existe. Si no existe, inicializalo al final.
 
