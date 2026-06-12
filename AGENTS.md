@@ -13,6 +13,7 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 | "conectividad" / "red" / "no llega" / "ping" / "DNS" / "traceroute" / "firewall" | **network-debug** |
 | "SSL" / "certificado" / "HTTPS" / "vencimiento" / "TLS" | **ssl-check** |
 | "Digifort" / "NVR" / "cámaras" / "servidor de video" / "GetUsage" / "GetCameras" | **digifort** |
+| "auditá la seguridad" / "Lynis" / "vulnerabilidades" / "hardening" / "security audit" / "CIS" | **security-audit** |
 
 ## Flujo de trabajo
 

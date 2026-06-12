@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/Tools-7-7C3AED?style=flat-square">
+  <img src="https://img.shields.io/badge/Tools-8-7C3AED?style=flat-square">
   <img src="https://img.shields.io/badge/Skills-1-22C55E?style=flat-square">
   <img src="https://img.shields.io/badge/Powered%20by-OpenCode-FF6B35?style=flat-square">
 </p>
@@ -29,6 +29,7 @@
   - [network-debug](#-network-debug)
   - [ssl-check](#-ssl-check)
   - [digifort](#-digifort)
+  - [security-audit](#-security-audit)
 - [Memoria Persistente](#-memoria-persistente)
 - [Flujo de Trabajo](#-flujo-de-trabajo)
 - [Instalación](#-instalación)
@@ -51,6 +52,7 @@
 - 🌐 Analizar problemas de conectividad y red
 - 🔐 Verificar certificados SSL/TLS
 - 📹 Consultar servidores Digifort (NVR) — uso, cámaras, estado de grabación
+- 🛡️ Auditar seguridad con Lynis — hardening index, warnings, suggestions
 - 🧠 Mantener **memoria persistente** de cada servidor e incidentes
 
 Todo **read-only** y **sin sudo** — seguro para entornos de producción.
@@ -78,7 +80,8 @@ sysadmin-ai-ecosystem/
     │   ├── k8s-debug.ts
     │   ├── network-debug.ts
     │   ├── ssl-check.ts
-    │   └── digifort.ts            ← HTTP directo (sin SSH)
+    │   ├── digifort.ts            ← HTTP directo (sin SSH)
+    │   └── security-audit.ts      ← Lynis security audit
     └── skills/
         └── host-memory/
             └── SKILL.md           ← Skill de gestión de memoria
@@ -209,6 +212,21 @@ Consulta el estado de un servidor Digifort (NVR) vía HTTP directo (no SSH). Lee
 - **cameras-status** — estado de grabación: ok/falla, uptime, horas de grabación, disco usado
 - **filter** — sin filter muestra solo cantidad + 5; con filter, todas las coincidencias
 
+### 🛡️ security-audit
+
+Ejecuta Lynis security audit en el servidor remoto. Descarga Lynis a `/tmp` si no está instalado. Read-only, sin sudo.
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `host` | `string` | Servidor remoto |
+| `port` | `number?` | Puerto SSH (22) |
+| `username` | `string?` | Usuario SSH |
+| `identityFile` | `string?` | Clave SSH (auto-detectada) |
+| `mode` | `string?` | `quick` (default, resumen) o `full` (reporte completo) |
+
+**Salida (quick):** Hardening Index, cantidad de warnings/suggestions, top 10 de cada uno.
+**Salida (full):** Reporte Lynis completo (formato key=value).
+
 ---
 
 ## 🧠 Memoria Persistente
@@ -249,7 +267,7 @@ graph TD
     B -->|Sí| D[Leer memoria/hosts/]
     C --> E{Aplicar tool según problema}
     D --> E
-    E --> F[debug / docker-debug / k8s-debug / network-debug / ssl-check / digifort]
+    E --> F[debug / docker-debug / k8s-debug / network-debug / ssl-check / digifort / security-audit]
     F --> G[Actualizar memoria/hosts/]
     F --> H{Problema resuelto?}
     H -->|Sí| I[Crear incidente en memoria/incidentes/]
@@ -305,6 +323,8 @@ opencode
 | *"los pods en producción están reiniciando"* | `k8s-debug(host: "master1", namespace: "prod")` |
 | *"cómo está el NVR 10.10.10.10"* | `digifort(host: "10.10.10.10")` → usage + cameras + status |
 | *"mostrame solo la cámara de la entrada"* | `digifort(host: "10.10.10.10", action: "cameras", filter: "entrada")` |
+| *"auditá la seguridad del server 10.0.0.5"* | `security-audit(host: "10.0.0.5")` → hardening index + warnings + suggestions |
+| *"dame el reporte completo de lynis del server db1"* | `security-audit(host: "db1", mode: "full")` |
 
 ---
 
@@ -319,6 +339,7 @@ opencode
 ## 🗺️ Roadmap
 
 - [x] **`digifort`** — consulta de servidores Digifort NVR (uso, cámaras, estado de grabación)
+- [x] **`security-audit`** — auditoría de seguridad con Lynis
 - [ ] **`db-query`** — consultas SQL read-only a PostgreSQL/MySQL
 - [ ] **`ansible-run`** — ejecución de playbooks Ansible para remediación
 - [ ] **`prometheus-mcp`** — integración con Prometheus para métricas
