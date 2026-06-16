@@ -1,0 +1,15 @@
+# Sysadmin AI — Change v1
+schema: sysadmin.schema-description.v1
+name: sysadmin.change.v1
+version: 1
+description: a configuration or state change applied
+
+required_fields[5]: id,host,summary,action,applied_at
+
+fields[6]{name,type,description}:
+  id,string,"unique change id"
+  host,string,"affected host"
+  summary,string,"what changed"
+  action,string,"applied / rolledback / in-progress"
+  applied_at,string,"ISO 8601"
+  evidence,string?,"supporting output"

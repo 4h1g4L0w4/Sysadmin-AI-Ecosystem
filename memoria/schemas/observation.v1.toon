@@ -1,0 +1,18 @@
+# Sysadmin AI — Observation v1
+schema: sysadmin.schema-description.v1
+name: sysadmin.observation.v1
+version: 1
+description: a single observation event from a diagnostic tool
+
+required_fields[7]: id,entity,key,value,source,observed_at,confidence,ttl_days
+
+fields[9]{name,type,description}:
+  id,string,"unique observation id (e.g. uuid or hash)"
+  entity,string,"observed entity (host:IP, service:name, cluster:name)"
+  key,string,"attribute key (e.g. os.name, disk.usage.percent)"
+  value,string|number|bool,"observed value"
+  source,string,"tool that produced the observation (debug, recon, etc)"
+  observed_at,string,"ISO 8601 timestamp"
+  confidence,number,"0-1 confidence in the value"
+  ttl_days,number,"days before this fact is considered stale"
+  evidence,string?,"optional supporting output snippet"

@@ -1,0 +1,17 @@
+# Sysadmin AI — Incident v1
+schema: sysadmin.schema-description.v1
+name: sysadmin.incident.v1
+version: 1
+description: a resolved or open incident
+
+required_fields[6]: id,host,severity,summary,status,opened_at
+
+fields[8]{name,type,description}:
+  id,string,"unique incident id"
+  host,string,"affected host"
+  severity,string,"critical / warning / info"
+  summary,string,"short description"
+  status,string,"open / resolved / mitigated"
+  opened_at,string,"ISO 8601"
+  resolved_at,string?,"ISO 8601"
+  evidence,string?,"diagnostic output snippet"

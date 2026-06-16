@@ -1,0 +1,14 @@
+# Sysadmin AI — Host Profile v1
+schema: sysadmin.schema-description.v1
+name: sysadmin.host-profile.v1
+version: 1
+description: canonical host profile in TOON memory
+
+required_fields[5]: schema,entity,host,last_seen,facts
+
+tables[5]{name,fields,purpose}:
+  services,"name,status,enabled,port,source,observed_at,confidence,ttl_days","current known services"
+  ports,"proto,port,process,bind,state,source,observed_at,confidence,ttl_days","current known listeners / sockets"
+  facts,"key,value,source,observed_at,confidence,ttl_days","generic observed facts about the host"
+  known_risks,"id,severity,summary,status,source,observed_at,confidence,ttl_days","open or recent risks"
+  relations,"from,relation,to,confidence,observed_at","entity graph edges"

@@ -1,0 +1,12 @@
+# Sysadmin AI — Cluster Profile v1
+schema: sysadmin.schema-description.v1
+name: sysadmin.cluster-profile.v1
+version: 1
+description: canonical cluster / group profile in TOON memory
+
+required_fields[4]: schema,entity,name,last_seen
+
+tables[3]{name,fields,purpose}:
+  members,"host,role,source,observed_at,confidence,ttl_days","cluster members"
+  facts,"key,value,source,observed_at,confidence,ttl_days","generic observed facts"
+  relations,"from,relation,to,confidence,observed_at","entity graph edges"

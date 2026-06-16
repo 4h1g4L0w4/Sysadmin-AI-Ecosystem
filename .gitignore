@@ -15,11 +15,30 @@ node_modules/
 .opencode/package.json
 .opencode/package-lock.json
 
-# ─── Memoria local (contenido dinámico, no código fuente) ───
+# ─── Memoria Markdown legacy (contenido dinámico) ───
 memoria/hosts/*
 memoria/incidentes/*
 !memoria/hosts/.gitkeep
 !memoria/incidentes/.gitkeep
+
+# ─── Memoria TOON (contenido dinámico, no código fuente) ───
+memoria/entities/hosts/*
+memoria/entities/services/*
+memoria/entities/clusters/*
+memoria/events/observations/*
+memoria/events/incidents/*
+memoria/events/changes/*
+memoria/views/host-context/*
+!memoria/entities/hosts/.gitkeep
+!memoria/entities/services/.gitkeep
+!memoria/entities/clusters/.gitkeep
+!memoria/events/observations/.gitkeep
+!memoria/events/incidents/.gitkeep
+!memoria/events/changes/.gitkeep
+!memoria/views/host-context/.gitkeep
+
+# ─── Schemas TOON (son fuente, no ignorar) ───
+# memoria/schemas/ NO se ignora
 
 # ─── Sistema operativo ───
 .DS_Store

@@ -1,0 +1,13 @@
+# Sysadmin AI — Host Context v1 (compact IA view)
+schema: sysadmin.schema-description.v1
+name: sysadmin.host-context.v1
+version: 1
+description: compact host summary for AI consumption, generated from host profile
+
+required_fields[5]: schema,entity,generated_at,summary,current_services
+
+tables[4]{name,fields,purpose}:
+  current_services,"name,status,port,last_seen","active services"
+  current_ports,"proto,port,state,process,last_seen","active listeners"
+  open_risks,"id,severity,summary,last_seen","risks needing attention"
+  stale_facts,"key,value,observed_at,ttl_days,expired_since","facts beyond their ttl"

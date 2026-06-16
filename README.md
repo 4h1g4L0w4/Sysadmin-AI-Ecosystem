@@ -10,8 +10,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/Tools-10-7C3AED?style=flat-square">
-  <img src="https://img.shields.io/badge/Skills-4-22C55E?style=flat-square">
+  <img src="https://img.shields.io/badge/Tools-11-7C3AED?style=flat-square">
+  <img src="https://img.shields.io/badge/Skills-5-22C55E?style=flat-square">
   <img src="https://img.shields.io/badge/Powered%20by-OpenCode-FF6B35?style=flat-square">
 </p>
 
@@ -32,7 +32,9 @@
   - [security-audit](#-security-audit)
   - [patch-status](#-patch-status)
   - [proxy-debug](#-proxy-debug)
-- [Memoria Persistente](#-memoria-persistente)
+  - [memory](#-memory)
+- [Memoria Persistente (TOON)](#-memoria-persistente-toon)
+- [Migración desde Markdown](#-migración-desde-markdown)
 - [Flujo de Trabajo](#-flujo-de-trabajo)
 - [Instalación](#-instalación)
   - [Requisitos](#requisitos)
@@ -72,12 +74,24 @@ sysadmin-ai-ecosystem/
 ├── ssh-keys/                      ← Claves SSH (auto-detectadas)
 │   ├── id_ed25519
 │   └── id_ed25519.pub
-├── memoria/                       ← Memoria persistente
-│   ├── hosts/                     ← Info por servidor
-│   └── incidentes/                ← Registro de problemas resueltos
+├── memoria/                       ← Memoria persistente (TOON)
+│   ├── entities/hosts/            ← Estado consolidado hosts
+│   ├── entities/services/         ← Estado consolidado servicios
+│   ├── entities/clusters/         ← Estado consolidado clusters
+│   ├── events/observations/       ← Observaciones históricas
+│   ├── events/incidents/          ← Incidentes
+│   ├── events/changes/            ← Cambios aplicados
+│   ├── views/host-context/        ← Vista compacta para IA
+│   ├── schemas/                   ← Contratos TOON
+│   ├── hosts/                     ← [legacy] Markdown
+│   └── incidentes/                ← [legacy] Markdown
 └── .opencode/
+    ├── package.json               ← Dependencias npm
+    ├── node_modules/              ← @toon-format/toon
     ├── tools/                     ← Tools custom (TypeScript)
     │   ├── _ssh.ts                ← Helper SSH compartido
+    │   ├── _memory.ts             ← Helper memoria TOON
+    │   ├── memory.ts              ← Tool de gestión de memoria
     │   ├── debug.ts
     │   ├── recon.ts
     │   ├── docker-debug.ts
@@ -89,8 +103,14 @@ sysadmin-ai-ecosystem/
     │   ├── patch-status.ts        ← Package updates status
     │   └── proxy-debug.ts         ← Reverse proxy debug
     └── skills/
-        └── host-memory/
-            └── SKILL.md           ← Skill de gestión de memoria
+        ├── host-memory/
+        │   └── SKILL.md           ← Skill de gestión de memoria
+        ├── security-audit/
+        │   └── SKILL.md
+        ├── patch-status/
+        │   └── SKILL.md
+        └── proxy-debug/
+            └── SKILL.md
 ```
 
 ### ⚙️ Cómo funciona
@@ -102,13 +122,13 @@ Usuario → "chequeá el servidor 192.168.1.50 que está lento"
     [AGENTS.md] → deduce: usa debug
          │
          ▼
-    [memoria/hosts/192.168.1.50.md] → lee contexto previo
+    [memory read-host-context host=192.168.1.50] → contexto TOON
          │
          ▼
     [debug.ts] → SSH a 192.168.1.50, comandos read-only
          │
          ▼
-    [memoria/hosts/192.168.1.50.md] → actualiza con hallazgos
+    [memory write-observation] → guarda hallazgos en TOON
 ```
 
 ---
@@ -267,34 +287,114 @@ Diagnóstico de reverse proxies. Detecta automáticamente nginx, apache, caddy, 
 **Salida (logs):** Error log + resumen access log.
 **Salida (full):** Todo sin resumir.
 
+### 🧠 memory
+
+Gestión de memoria persistente en formato TOON. Lee/escribe observaciones, consolida entidades y genera vistas compactas para la IA.
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `action` | `string` | `init`, `read-host-context`, `write-observation`, `compact-host`, `render-host-context`, `stale`, `conflicts` |
+| `host` | `string?` | Hostname o IP (requerido para la mayoría de acciones) |
+| `observations` | `string?` | JSON array de observaciones (requerido para `write-observation`) |
+
+**Acciones:**
+- **init** — crea carpetas `entities/`, `events/`, `views/`, `schemas/`
+- **read-host-context** — devuelve el contexto TOON del host (vista compacta para IA)
+- **write-observation** — guarda observaciones, consolida entidad, regenera vista
+- **compact-host** — reconstruye entidad desde observaciones de la semana actual
+- **render-host-context** — regenera la vista de contexto
+- **stale** — lista facts vencidos de un host
+- **conflicts** — lista contradicciones detectadas (servicio activo pero puerto cerrado, etc.)
+
 ---
 
-## 🧠 Memoria Persistente
+## 🧠 Memoria Persistente (TOON)
 
-Cada servidor tiene un archivo markdown en `memoria/hosts/` que la IA consulta y actualiza automáticamente:
+La memoria canónica usa **TOON** (Token-Oriented Object Notation), un formato compacto para LLMs. Reemplaza al Markdown legacy como fuente de verdad.
 
-```markdown
-# 192.168.1.50
+### Arquitectura
 
-## Sistema
-- OS: Ubuntu 24.04 LTS
-- Kernel: 6.8.0-31-generic
-- Recursos: 8GB RAM, 4 vCPUs, 80GB disco
-
-## Servicios
-| Servicio | Estado | Puerto | Notas |
-|----------|--------|--------|-------|
-| nginx | active | 80/443 | reverse proxy principal |
-| postgresql@14-main | active | 5432 | |
-
-## Problemas conocidos
-| Fecha | Problema | Solución |
-|-------|----------|----------|
-| 2026-06-10 | nginx no levantaba | Puerto 80 ocupado por apache |
-
-## Incidentes relacionados
-- [2026-06-10-nginx-down](incidentes/2026-06-10-nginx-down.md)
 ```
+memoria/
+├── entities/hosts/<host>.toon      ← estado consolidado del host
+├── entities/services/<svc>.toon     ← estado consolidado de servicios
+├── entities/clusters/<cls>.toon     ← estado consolidado de clusters
+├── events/observations/<week>.toon  ← observaciones históricas (append)
+├── events/incidents/<id>.toon       ← incidentes
+├── events/changes/<id>.toon         ← cambios aplicados
+├── views/host-context/<host>.toon   ← vista compacta para IA (leer esto)
+└── schemas/*.toon                   ← contratos TOON
+```
+
+**Principios:**
+- **events/** = historial append-only — nunca se borra
+- **entities/** = estado consolidado actual — se actualiza por merge
+- **views/** = contexto generado para consumo rápido de la IA
+- **schemas/** = contratos TOON con descripción de tablas y campos
+
+### Flujo de datos
+
+```
+Tool (debug/recon/etc.)
+    │
+    ▼
+memory write-observation → events/observations/   (historial raw)
+    │
+    ▼
+                        → entities/hosts/<host>.toon  (consolidación por merge)
+    │
+    ▼
+                        → views/host-context/<host>.toon  (vista IA)
+```
+
+### Ejemplo: Host entity (TOON)
+
+```toon
+schema: sysadmin.host-profile.v1
+entity: host:192.168.1.50
+host: 192.168.1.50
+hostname: web-prod-01
+last_seen: 2026-06-12T14:22:00-03:00
+
+roles[2]: reverse-proxy,app-host
+
+services[2]{name,status,enabled,port,source,observed_at,confidence,ttl_days}:
+  nginx,active,true,443,recon,2026-06-12T14:22:00-03:00,0.96,7
+  docker,active,true,,debug,2026-06-12T14:22:00-03:00,0.94,14
+
+facts[2]{key,value,source,observed_at,confidence,ttl_days}:
+  os.name,Ubuntu,recon,2026-06-12T14:22:00-03:00,0.98,30
+  disk.root.usage_percent,82,debug,2026-06-12T14:22:00-03:00,0.98,3
+
+known_risks[1]{id,severity,summary,status,source,observed_at,confidence,ttl_days}:
+  disk_root_high,warning,"root filesystem above 80%",open,debug,2026-06-12T14:22:00-03:00,0.90,3
+```
+
+### Ejemplo: Host context view (TOON — lo que lee la IA)
+
+```toon
+schema: sysadmin.host-context.v1
+entity: host:192.168.1.50
+generated_at: 2026-06-12T15:00:00-03:00
+
+summary:
+  health: warning
+  role: reverse-proxy + app-host
+  reason: root filesystem above 80%
+
+current_services[2]{name,status,port,last_seen}:
+  nginx,active,443,2026-06-12T14:22:00-03:00
+  docker,active,,2026-06-12T14:22:00-03:00
+
+open_risks[1]{id,severity,summary,last_seen}:
+  disk_root_high,warning,"root filesystem above 80%",2026-06-12T14:22:00-03:00
+
+recommended_next_tools[2]: disk-debug,service-debug
+```
+
+### Legacy Markdown
+
+Los archivos `memoria/hosts/*.md` e `memoria/incidentes/*.md` **NO se borran**. Se mantienen como fallback para hosts sin contexto TOON. La IA lee views/ primero; si no existe, cae a Markdown.
 
 ---
 
@@ -304,14 +404,14 @@ Cada servidor tiene un archivo markdown en `memoria/hosts/` que la IA consulta y
 graph TD
     A[Usuario pide ayuda] --> B{Host conocido?}
     B -->|No| C[recon → mapear servidor]
-    B -->|Sí| D[Leer memoria/hosts/]
+    B -->|Sí| D[memory read-host-context]
     C --> E{Aplicar tool según problema}
     D --> E
     E --> F[debug / docker-debug / k8s-debug / network-debug / ssl-check / digifort / security-audit / patch-status / proxy-debug]
-    F --> G[Actualizar memoria/hosts/]
+    F --> G[memory write-observation]
     F --> H{Problema resuelto?}
-    H -->|Sí| I[Crear incidente en memoria/incidentes/]
-    H -->|No| J[Documentar hallazgos]
+    H -->|Sí| I[Registrar incidente TOON]
+    H -->|No| J[Documentar hallazgos en observaciones]
     I --> K[Fin]
     J --> K
 ```
@@ -369,6 +469,36 @@ opencode
 | *"mostrame solo los security updates del server app1"* | `patch-status(host: "app1", mode: "security")` |
 | *"el proxy no responde, da 502"* | `proxy-debug(host: "proxy1")` → syntax check + errores + 5xx |
 | *"revisá la config de apache en web1"* | `proxy-debug(host: "web1", mode: "config", proxy: "apache")` |
+| *"guardá el estado actual del server 10.0.0.5"* | `memory action=write-observation host=10.0.0.5 observations=<JSON>` |
+| *"qué sabe la memoria sobre db1"* | `memory action=read-host-context host=db1` |
+| *"inicializá la memoria"* | `memory action=init` |
+
+---
+
+## 📦 Migración desde Markdown
+
+La memoria canónica del proyecto migró de Markdown (`memoria/hosts/*.md`) a **TOON** (`memoria/entities/hosts/*.toon`).
+
+**Qué cambió:**
+- Memoria canónica → TOON (formato compacto para LLMs)
+- La IA lee `views/host-context/*.toon` en lugar de `hosts/*.md`
+- Las observaciones se guardan con `memory write-observation`
+- El historial queda en `events/observations/` (append-only)
+
+**Qué NO cambió:**
+- Los archivos `memoria/hosts/*.md` NO se borran
+- La IA puede caer a Markdown si no hay contexto TOON
+- Las tools existentes siguen funcionando sin cambios
+- La falla de memoria no rompe el diagnóstico
+
+**Para migrar datos existentes:**
+
+```bash
+opencode
+> memory action=init
+# Luego, para cada host con Markdown legacy:
+> memory action=compact-host host=<ip>
+```
 
 ---
 
@@ -376,12 +506,13 @@ opencode
 
 | Skill | Descripción |
 |-------|-------------|
-| [host-memory](.opencode/skills/host-memory/SKILL.md) | Instrucciones para que la IA lea/actualice `memoria/hosts/` y registre incidentes automáticamente |
+| [host-memory](.opencode/skills/host-memory/SKILL.md) | Gestión de memoria TOON + fallback Markdown. Incluye lectura de contexto y escritura de observaciones |
 | [security-audit](.opencode/skills/security-audit/SKILL.md) | Cuándo y cómo ejecutar auditorías Lynis, interpretar resultados, persistir hallazgos |
 | [patch-status](.opencode/skills/patch-status/SKILL.md) | Evaluación de actualizaciones pendientes, compatibilidad y riesgos de upgrade |
 | [proxy-debug](.opencode/skills/proxy-debug/SKILL.md) | Diagnóstico de reverse proxies, interpretación de errores comunes |
 
 ---
+
 
 ## 🗺️ Roadmap
 
@@ -389,6 +520,7 @@ opencode
 - [x] **`security-audit`** — auditoría de seguridad con Lynis
 - [x] **`patch-status`** — estado de parches y actualizaciones
 - [x] **`proxy-debug`** — diagnóstico de reverse proxies
+- [x] **`memory`** — memoria persistente TOON con lectura/escritura/consolidación
 - [ ] **`db-query`** — consultas SQL read-only a PostgreSQL/MySQL
 - [ ] **`ansible-run`** — ejecución de playbooks Ansible para remediación
 - [ ] **`prometheus-mcp`** — integración con Prometheus para métricas
