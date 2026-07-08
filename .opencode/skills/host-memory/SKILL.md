@@ -28,11 +28,11 @@ Legacy Markdown (no tocar, solo fallback):
 
 ### 1. ANTES de ejecutar debug/recon/k8s-debug/docker-debug/network-debug/ssl-check/digifort/security-audit/patch-status/proxy-debug
 
-Ejecutá `memory read-host-context host=<host>`. Si no existe, caé a `./memoria/hosts/<host>.md` (legacy).
+Ejecutá `memory-read-context host=<host>`. Si no existe, caé a `./memoria/hosts/<host>.md` (legacy).
 
 ### 2. DESPUÉS de obtener datos
 
-Guardá observaciones con `memory write-observation`. Cada observación debe incluir:
+Guardá observaciones con `memory-write`. Cada observación debe incluir:
 - `id` — único
 - `entity` — ej: `host:192.168.1.50`
 - `key` — ej: `service.nginx`, `os.name`, `disk.usage_percent`
@@ -50,10 +50,10 @@ Esto actualiza automáticamente:
 
 ### 3. Si resolviste un problema
 
-Registralo como incidente TOON con `memory write-observation`, usando key `incident.<id>` y value con descripción. Opcional: crear `events/incidents/<id>.toon` manualmente.
+Registralo como incidente TOON con `memory-write`, usando key `incident.<id>` y value con descripción. Opcional: crear `events/incidents/<id>.toon` manualmente.
 
 ## Reglas
 - NO borrés memoria legacy Markdown.
 - **NUNCA guardar secretos, passwords, tokens ni IPs reales.** La redacción automática ayuda pero no es infalible.
-- Si `memory` falla, seguí usando las tools de diagnóstico normalmente y actualizá el Markdown legacy como antes.
-- No confiar en facts vencidos sin refrescarlos — corré `memory stale host=<host>` primero.
+- Si `memory-*` falla, seguí usando las tools de diagnóstico normalmente y actualizá el Markdown legacy como antes.
+- No confiar en facts vencidos sin refrescarlos — corré `memory-stale host=<host>` primero.

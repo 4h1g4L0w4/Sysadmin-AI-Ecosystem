@@ -20,6 +20,10 @@ export default tool({
       .string()
       .optional()
       .describe("Path to SSH private key (auto-detected from ssh-keys/ if omitted)"),
+    proxyJump: tool.schema
+      .string()
+      .optional()
+      .describe("SSH proxy/jump host (e.g. 'user@bastion:22')"),
     mode: tool.schema
       .string()
       .optional()
@@ -36,6 +40,7 @@ export default tool({
       identityFile:
         args.identityFile ||
         resolveSshKey(context.directory || context.worktree),
+      proxyJump: args.proxyJump,
     };
 
     const cmd = [

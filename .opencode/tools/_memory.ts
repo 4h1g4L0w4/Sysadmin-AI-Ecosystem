@@ -609,13 +609,7 @@ function recommendTools(
   profile: HostProfile,
 ): string[] {
   const tools: string[] = [];
-  if (health === "critical" || health === "warning") {
-    if (profile.known_risks.some((r) => r.summary.includes("disk") || r.summary.includes("filesystem"))) {
-      tools.push("disk-debug");
-    }
-    if (profile.known_risks.some((r) => r.summary.includes("memory") || r.summary.includes("oom"))) {
-      tools.push("memory-debug");
-    }
+    if (health === "critical" || health === "warning") {
     tools.push("debug");
   }
   if (stale.length > 0) tools.push("recon");
@@ -629,31 +623,56 @@ function recommendTools(
 export async function getHostTextContext(host: string): Promise<string> {
   const safeHost = sanitizeEntityId(host);
   const viewPath = path.join(DIRS.views(), `${safeHost}.toon`);
+  const hostPath = path.join(DIRS.hosts(), `${safeHost}.toon`);
+
+  let content = "";
 
   if (existsSync(viewPath)) {
-    return await readFile(viewPath, "utf-8");
-  }
-
-  // Try generating from entity
-  const hostPath = path.join(DIRS.hosts(), `${safeHost}.toon`);
-  if (existsSync(hostPath)) {
+    content = await readFile(viewPath, "utf-8");
+  } else if (existsSync(hostPath)) {
     await renderHostContext(host);
     if (existsSync(viewPath)) {
-      return await readFile(viewPath, "utf-8");
+      content = await readFile(viewPath, "utf-8");
     }
   }
 
-  return (
-    `# Auto-generated minimal context\n` +
-    `schema: sysadmin.host-context.v1\n` +
-    `entity: host:${host}\n` +
-    `generated_at: ${nowIso()}\n` +
-    `\n` +
-    `summary:\n` +
-    `  health: unknown\n` +
-    `  role: unknown\n` +
-    `  reason: no memory for this host\n`
-  );
+  if (!content) {
+    return (
+      `# Auto-generated minimal context\n` +
+      `schema: sysadmin.host-context.v1\n` +
+      `entity: host:${host}\n` +
+      `generated_at: ${nowIso()}\n` +
+      `\n` +
+      `summary:\n` +
+      `  health: unknown\n` +
+      `  role: unknown\n` +
+      `  reason: no memory for this host\n`
+    );
+  }
+
+  // Append stale fact warning if any exist
+  try {
+    if (existsSync(hostPath)) {
+      const profile = await readToonFile<HostProfile>(hostPath, null!);
+      if (profile) {
+        const stale = detectStaleFacts(profile);
+        if (stale.length > 0) {
+          content += `\n# ⚠ Stale facts detected: ${stale.length}\n`;
+          for (const f of stale.slice(0, 5)) {
+            content += `#   ${f.key} = ${f.value} (TTL ${f.ttl_days}d, expired ${f.expired_since})\n`;
+          }
+          if (stale.length > 5) {
+            content += `#   ... and ${stale.length - 5} more. Run memory-stale host=${host} to see all.\n`;
+          }
+          content += `# Run recon or the relevant tool to refresh these facts.\n`;
+        }
+      }
+    }
+  } catch {
+    // stale check is a best-effort enhancement
+  }
+
+  return content;
 }
 
 /* ── Exports for external integration ────────────────────────────── */

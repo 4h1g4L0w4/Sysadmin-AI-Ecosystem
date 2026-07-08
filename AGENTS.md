@@ -20,15 +20,15 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 ## Flujo de trabajo
 
 1. **Host nuevo / desconocido** → corré `recon` primero para mapear el servidor.
-2. **Host conocido** → corré `memory read-host-context host=<host>` para leer el contexto TOON antes de diagnosticar.
+2. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
    - Si no hay contexto TOON, caé a `./memoria/hosts/<host>.md` (legacy).
 3. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.).
 4. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
-5. **Siempre al finalizar** → guardá observaciones relevantes con `memory write-observation`.
+5. **Siempre al finalizar** → guardá observaciones relevantes con `memory-write host=<host> observations=<JSON>`.
    - Cada observación debe incluir: `id`, `entity`, `key`, `value`, `source`, `observed_at`, `confidence`, `ttl_days`.
    - **NUNCA guardar secretos, passwords, tokens ni IPs reales.**
-6. **Si resolviste un problema** → registralo como incidente TOON.
-7. **No confiar en facts vencidos** → corré `memory stale host=<host>` antes de reusar facts viejos.
+6. **Si resolviste un problema** → registralo como incidente TOON con `memory-write`.
+7. **No confiar en facts vencidos** → corré `memory-stale host=<host>` antes de reusar facts viejos.
 
 ## Memoria TOON (canónica)
 
@@ -50,9 +50,52 @@ memoria/
 - **entities/** = estado consolidado actual
 - **views/** = contexto generado para consumo rápido de la IA
 - La IA lee **views/host-context/** primero. Si no existe, genera desde entities.
-- Después de cada tool, escribir observaciones con `memory write-observation`.
+- Después de cada tool, escribir observaciones con `memory-write`.
 - No confiar en facts vencidos sin refrescarlos.
-- Si `memory` falla, las tools de diagnóstico siguen funcionando.
+- Si `memory-*` falla, las tools de diagnóstico siguen funcionando.
+
+## Prioridad de selección
+
+Cuando un mensaje mencione **múltiples** categorías, aplicá este orden de prioridad:
+
+1. **Seguridad** → `security-audit`
+2. **Parches** → `patch-status`
+3. **Proxies / Web server** → `proxy-debug`
+4. **SSL/TLS** → `ssl-check`
+5. **Digifort / NVR** → `digifort`
+6. **Kubernetes** → `k8s-debug`
+7. **Docker / Contenedores** → `docker-debug`
+8. **Red / Conectividad** → `network-debug`
+9. **General / Estado del server** → `debug`
+10. **Descubrimiento / Mapeo** → `recon`
+
+Ejemplos:
+- *"el server web1 está lento y tiene el disco lleno"* → **debug** (general), no patch-status
+- *"el server web1 tiene actualizaciones pendientes y problemas de red"* → **patch-status** (prioridad 2 sobre network-debug)
+- *"revisá el server X completo"* → podés **componer**: debug + recon + patch-status en paralelo
+
+## Composición de tools
+
+Podés ejecutar **múltiples tools** en una misma interacción si el pedido lo amerita:
+
+| Pedido del usuario | Tools a ejecutar |
+|---|---|
+| "revisá el server X completo" | `memory-read-context` + `debug` + `recon` + `patch-status` (modo quick) |
+| "auditá seguridad + parches en X" | `security-audit` + `patch-status` |
+| "diagnóstico completo de red y proxy" | `network-debug` + `proxy-debug` |
+| "todo lo que sepas de X" | `memory-read-context` + todas las tools relevantes según el contexto |
+
+Al componer:
+- Si el host es **conocido**, leé contexto primero con `memory-read-context`
+- Si el host es **desconocido**, empezá con `recon`
+- Consolidá los resultados en una respuesta única
+
+## Catch-all
+
+Si el mensaje del usuario **no matchea** ninguna categoría de la tabla:
+- Preguntá **cuál es el servidor** primero
+- Si ya hay un servidor en contexto, ejecutá **`debug`** como default
+- Si hay dudas sobre qué tool usar, preferí **`recon`** (es la más completa para entender un server)
 
 ## Configuración de credenciales
 

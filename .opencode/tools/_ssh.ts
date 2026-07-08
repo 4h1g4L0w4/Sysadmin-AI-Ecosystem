@@ -7,6 +7,7 @@ export interface SshOptions {
   port?: number;
   username?: string;
   identityFile?: string;
+  proxyJump?: string;
 }
 
 export function resolveSshKey(baseDir?: string): string | undefined {
@@ -37,11 +38,42 @@ function sshCliArgs(options: SshOptions): string[] {
   if (options.port) args.push("-p", String(options.port));
   if (options.username) args.push("-l", options.username);
   if (options.identityFile) args.push("-i", options.identityFile);
+  if (options.proxyJump) args.push("-J", options.proxyJump);
   return args;
+}
+
+function findRepoRoot(): string | undefined {
+  const candidates = [
+    process.env.OPENCODE_DIRECTORY,
+    process.cwd(),
+  ].filter(Boolean) as string[];
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, "AGENTS.md"))) return dir;
+  }
+  return undefined;
+}
+
+function auditLog(options: SshOptions, commands: string[]): void {
+  try {
+    const root = findRepoRoot();
+    if (!root) return;
+    const logDir = path.join(root, "memoria", "events", "audit");
+    fs.mkdirSync(logDir, { recursive: true });
+    const timestamp = new Date().toISOString();
+    const user = options.username || "root";
+    const cmdSummary = commands.length > 5
+      ? `${commands.length} commands`
+      : commands.join("; ").slice(0, 200);
+    const line = `[${timestamp}] ${user}@${options.host}${options.proxyJump ? ` (via ${options.proxyJump})` : ""} — ${cmdSummary}\n`;
+    fs.appendFileSync(path.join(logDir, "ssh.log"), line, "utf-8");
+  } catch {
+    // audit logging is best-effort
+  }
 }
 
 export function sshExec(options: SshOptions, commands: string[], timeout = 60_000): string {
   const args = [...sshCliArgs(options), options.host, commands.join(" ; ")];
+  auditLog(options, commands);
   try {
     const result = execFileSync("ssh", args, {
       timeout,

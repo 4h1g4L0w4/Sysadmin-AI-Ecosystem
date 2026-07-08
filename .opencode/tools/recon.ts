@@ -20,6 +20,10 @@ export default tool({
       .string()
       .optional()
       .describe("Path to SSH private key file (auto-detected from ssh-keys/ if omitted)"),
+    proxyJump: tool.schema
+      .string()
+      .optional()
+      .describe("SSH proxy/jump host (e.g. 'user@bastion:22')"),
   },
   async execute(args, context) {
     const sshOpts: SshOptions = {
@@ -27,6 +31,7 @@ export default tool({
       port: args.port,
       username: args.username,
       identityFile: args.identityFile || resolveSshKey(context.directory || context.worktree),
+      proxyJump: args.proxyJump,
     };
 
     const cmds: string[] = [

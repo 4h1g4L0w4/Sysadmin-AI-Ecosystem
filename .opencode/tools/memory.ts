@@ -94,6 +94,21 @@ export default tool({
             return "ERROR: 'observations' must be a non-empty array";
           }
 
+          const requiredFields = ["id", "key", "value", "source", "observed_at", "confidence", "ttl_days"];
+          for (let i = 0; i < obs.length; i++) {
+            const o = obs[i];
+            const missing = requiredFields.filter((f) => o[f] === undefined || o[f] === null);
+            if (missing.length > 0) {
+              return `ERROR: observation #${i} (id='${o.id || "?"}') missing required fields: ${missing.join(", ")}`;
+            }
+            if (typeof o.confidence !== "number" || o.confidence < 0 || o.confidence > 1) {
+              return `ERROR: observation #${i} confidence must be a number between 0 and 1, got ${o.confidence}`;
+            }
+            if (typeof o.ttl_days !== "number" || o.ttl_days < 0) {
+              return `ERROR: observation #${i} ttl_days must be a non-negative number, got ${o.ttl_days}`;
+            }
+          }
+
           // Ensure valid host entity on each
           for (const o of obs) {
             if (!o.entity) o.entity = `host:${host}`;
