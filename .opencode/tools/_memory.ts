@@ -1,7 +1,8 @@
 import { encode as toonEncode, decode as toonDecode } from "@toon-format/toon";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from "fs";
-import { readFile, writeFile, rename, unlink, mkdir } from "fs/promises";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "fs";
+import { readFile, writeFile, rename, mkdir } from "fs/promises";
 import path from "path";
+import { projectRoot } from "./_root";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -134,18 +135,7 @@ export interface Conflict {
 
 /* ── Paths ──────────────────────────────────────────────────────── */
 
-const ROOT = findRepoRoot();
-
-function findRepoRoot(): string {
-  let dir = process.cwd();
-  for (let i = 0; i < 10; i++) {
-    if (existsSync(path.join(dir, "AGENTS.md"))) return dir;
-    const p = path.dirname(dir);
-    if (p === dir) break;
-    dir = p;
-  }
-  return process.cwd();
-}
+const ROOT = projectRoot();
 
 const DIRS = {
   hosts: () => path.join(ROOT, "memoria", "entities", "hosts"),
@@ -197,9 +187,7 @@ export function obsWeekKey(date?: Date): string {
   return `${year}-W${String(week).padStart(2, "0")}`;
 }
 
-export function projectRoot(): string {
-  return ROOT;
-}
+
 
 /* ── TOON File I/O ─────────────────────────────────────────────── */
 
@@ -673,6 +661,70 @@ export async function getHostTextContext(host: string): Promise<string> {
   }
 
   return content;
+}
+
+/* ── Validation ──────────────────────────────────────────────────── */
+
+const REQUIRED_OBS_FIELDS = ["id", "key", "value", "source", "observed_at", "confidence", "ttl_days"];
+
+export function validateObservations(obs: any[], host: string): string | null {
+  if (!Array.isArray(obs) || obs.length === 0) {
+    return "ERROR: 'observations' must be a non-empty array";
+  }
+
+  for (let i = 0; i < obs.length; i++) {
+    const o = obs[i];
+    const missing = REQUIRED_OBS_FIELDS.filter((f) => o[f] === undefined || o[f] === null);
+    if (missing.length > 0) {
+      return `ERROR: observation #${i} (id='${o.id || "?"}') missing required fields: ${missing.join(", ")}`;
+    }
+    if (typeof o.confidence !== "number" || o.confidence < 0 || o.confidence > 1) {
+      return `ERROR: observation #${i} confidence must be a number between 0 and 1, got ${o.confidence}`;
+    }
+    if (typeof o.ttl_days !== "number" || o.ttl_days < 0) {
+      return `ERROR: observation #${i} ttl_days must be a non-negative number, got ${o.ttl_days}`;
+    }
+  }
+
+  for (const o of obs) {
+    if (!o.entity) o.entity = `host:${host}`;
+  }
+
+  return null;
+}
+
+/* ── Formatters ─────────────────────────────────────────────────── */
+
+export async function staleHostFacts(host: string): Promise<string> {
+  const safeHost = sanitizeEntityId(host);
+  const profilePath = path.join(DIRS.hosts(), `${safeHost}.toon`);
+  if (!existsSync(profilePath)) {
+    return `No profile found for ${host}. Run write-observation first.`;
+  }
+  const profile = await readToonFile<HostProfile>(profilePath, null!);
+  if (!profile) return `Cannot read profile for ${host}.`;
+  const stale = detectStaleFacts(profile);
+  if (stale.length === 0) return `No stale facts for ${host}.`;
+  const lines = stale.map(
+    (f) => `  ${f.key} = ${f.value} (observed ${f.observed_at}, TTL ${f.ttl_days}d, expired)`,
+  );
+  return `Stale facts for ${host} (${stale.length}):\n${lines.join("\n")}`;
+}
+
+export async function conflictsHost(host: string): Promise<string> {
+  const safeHost = sanitizeEntityId(host);
+  const profilePath = path.join(DIRS.hosts(), `${safeHost}.toon`);
+  if (!existsSync(profilePath)) {
+    return `No profile found for ${host}. Run write-observation first.`;
+  }
+  const profile = await readToonFile<HostProfile>(profilePath, null!);
+  if (!profile) return `Cannot read profile for ${host}.`;
+  const conflicts = detectConflicts(profile);
+  if (conflicts.length === 0) return `No conflicts detected for ${host}.`;
+  const lines = conflicts.map(
+    (c) => `  [${c.severity}] ${c.description} (sources: ${c.sources.join(", ")})`,
+  );
+  return `Conflicts for ${host} (${conflicts.length}):\n${lines.join("\n")}`;
 }
 
 /* ── Exports for external integration ────────────────────────────── */

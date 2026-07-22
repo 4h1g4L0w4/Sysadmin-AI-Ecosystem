@@ -1,86 +1,218 @@
 import { tool } from "@opencode-ai/plugin";
 import { sshExec, SshOptions, resolveSshKey } from "./_ssh";
 
-const NGINX_CMDS = `
-echo "==NGINX_VERSION=="
-nginx -V 2>&1 || true
-echo "==NGINX_CONFIGTEST=="
-nginx -t 2>&1 || true
-echo "==NGINX_CONFIG=="
-for d in /etc/nginx/sites-enabled /etc/nginx/conf.d /etc/nginx/nginx.conf; do
-  [ -d "$d" ] && grep -rnh 'listen\\|server_name\\|proxy_pass\\|upstream\\|return\\|location' "$d" 2>/dev/null | head -60
-  [ -f "$d" ] && grep -n 'listen\\|server_name\\|proxy_pass\\|upstream\\|return\\|location' "$d" 2>/dev/null | head -60
-done
-echo "==NGINX_ERRORLOG=="
-for f in /var/log/nginx/error.log /var/log/nginx/error.log.1 /usr/local/nginx/logs/error.log; do
-  [ -f "$f" ] && tail -50 "$f" && break
-done 2>/dev/null
-journalctl -u nginx -n 50 --no-pager 2>/dev/null | tail -50 || true
-echo "==NGINX_ACCESS=="
-for f in /var/log/nginx/access.log /var/log/nginx/access.log.1; do
-  [ -f "$f" ] && tail -200 "$f" && break
-done 2>/dev/null
-`;
+interface ProxyPaths {
+  configDirs: string[];
+  configFiles: string[];
+  errorLogs: string[];
+  accessLogs: string[];
+  unitName: string;
+}
 
-const APACHE_CMDS = `
-echo "==APACHE_VERSION=="
-apache2ctl -V 2>/dev/null || httpd -V 2>/dev/null || true
-echo "==APACHE_CONFIGTEST=="
-apache2ctl -t 2>/dev/null || httpd -t 2>/dev/null || true
-echo "==APACHE_VHOSTS=="
-apache2ctl -S 2>/dev/null || httpd -S 2>/dev/null || true
-echo "==APACHE_CONFIG=="
-for d in /etc/apache2/sites-enabled /etc/httpd/conf.d /etc/apache2/conf-enabled; do
-  [ -d "$d" ] && grep -rnh 'VirtualHost\\|DocumentRoot\\|ProxyPass\\|ProxyPassReverse\\|ServerName\\|Listen\\|<Location' "$d" 2>/dev/null | head -60
-done
-echo "==APACHE_ERRORLOG=="
-for f in /var/log/apache2/error.log /var/log/httpd/error_log /var/log/apache2/error.log.1; do
-  [ -f "$f" ] && tail -50 "$f" && break
-done 2>/dev/null
-echo "==APACHE_ACCESS=="
-for f in /var/log/apache2/access.log /var/log/httpd/access_log /var/log/apache2/access.log.1; do
-  [ -f "$f" ] && tail -200 "$f" && break
-done 2>/dev/null
-`;
+const DEFAULT_PATHS: Record<string, ProxyPaths> = {
+  nginx: {
+    configDirs: ["/etc/nginx/sites-enabled", "/etc/nginx/conf.d"],
+    configFiles: ["/etc/nginx/nginx.conf"],
+    errorLogs: ["/var/log/nginx/error.log", "/var/log/nginx/error.log.1", "/usr/local/nginx/logs/error.log"],
+    accessLogs: ["/var/log/nginx/access.log", "/var/log/nginx/access.log.1"],
+    unitName: "nginx",
+  },
+  apache: {
+    configDirs: ["/etc/apache2/sites-enabled", "/etc/httpd/conf.d", "/etc/apache2/conf-enabled"],
+    configFiles: [],
+    errorLogs: ["/var/log/apache2/error.log", "/var/log/httpd/error_log", "/var/log/apache2/error.log.1"],
+    accessLogs: ["/var/log/apache2/access.log", "/var/log/httpd/access_log", "/var/log/apache2/access.log.1"],
+    unitName: "apache2",
+  },
+  caddy: {
+    configDirs: [],
+    configFiles: ["/etc/caddy/Caddyfile", "~/Caddyfile"],
+    errorLogs: [],
+    accessLogs: [],
+    unitName: "caddy",
+  },
+  traefik: {
+    configDirs: [],
+    configFiles: ["/etc/traefik/traefik.yml", "/etc/traefik/traefik.toml", "/etc/traefik/traefik.yaml"],
+    errorLogs: [],
+    accessLogs: [],
+    unitName: "traefik",
+  },
+  haproxy: {
+    configDirs: [],
+    configFiles: ["/etc/haproxy/haproxy.cfg"],
+    errorLogs: ["/var/log/haproxy.log", "/var/log/haproxy/access.log"],
+    accessLogs: [],
+    unitName: "haproxy",
+  },
+};
 
-const CADDY_CMDS = `
-echo "==CADDY_VERSION=="
-caddy version 2>/dev/null || true
-echo "==CADDY_CONFIG=="
-for f in /etc/caddy/Caddyfile ~/Caddyfile; do
-  [ -f "$f" ] && grep -n 'reverse_proxy\\|handle_path\\|respond\\|redir\\|route\\|tls' "$f" 2>/dev/null | head -60 && break
-done
-echo "==CADDY_VALIDATE=="
-for f in /etc/caddy/Caddyfile ~/Caddyfile; do
-  [ -f "$f" ] && caddy validate --config "$f" 2>&1 && break
-done 2>/dev/null
-echo "==CADDY_LOGS=="
-journalctl -u caddy -n 50 --no-pager 2>/dev/null || true
-`;
+function buildVersionCmd(proxy: string): string {
+  const cmds: Record<string, string> = {
+    nginx: `echo "==NGINX_VERSION=="\nnginx -V 2>&1 || true`,
+    apache: `echo "==APACHE_VERSION=="\napache2ctl -V 2>/dev/null || httpd -V 2>/dev/null || true`,
+    caddy: `echo "==CADDY_VERSION=="\ncaddy version 2>/dev/null || true`,
+    traefik: `echo "==TRAEFIK_VERSION=="\ntraefik version 2>/dev/null || true`,
+    haproxy: `echo "==HAPROXY_VERSION=="\nhaproxy -v 2>/dev/null || true`,
+  };
+  return cmds[proxy] || "";
+}
 
-const TRAEFIK_CMDS = `
-echo "==TRAEFIK_VERSION=="
-traefik version 2>/dev/null || true
-echo "==TRAEFIK_CONFIG=="
-for f in /etc/traefik/traefik.yml /etc/traefik/traefik.toml /etc/traefik/traefik.yaml; do
-  [ -f "$f" ] && head -80 "$f" && break
-done 2>/dev/null
-echo "==TRAEFIK_LOGS=="
-journalctl -u traefik -n 50 --no-pager 2>/dev/null || true
-`;
+function buildConfigTestCmd(proxy: string, paths: ProxyPaths): string {
+  switch (proxy) {
+    case "nginx":
+      return `echo "==NGINX_CONFIGTEST=="\nnginx -t 2>&1 || true`;
+    case "apache":
+      return `echo "==APACHE_CONFIGTEST=="\napache2ctl -t 2>/dev/null || httpd -t 2>/dev/null || true`;
+    case "haproxy":
+      return `echo "==HAPROXY_CONFIGTEST=="\nhaproxy -c -f ${paths.configFiles[0] || "/etc/haproxy/haproxy.cfg"} 2>/dev/null || true`;
+    default:
+      return "";
+  }
+}
 
-const HAPROXY_CMDS = `
-echo "==HAPROXY_VERSION=="
-haproxy -v 2>/dev/null || true
-echo "==HAPROXY_CONFIGTEST=="
-haproxy -c -f /etc/haproxy/haproxy.cfg 2>/dev/null || true
-echo "==HAPROXY_CONFIG=="
-[ -f /etc/haproxy/haproxy.cfg ] && grep -n 'frontend\\|backend\\|listen\\|server\\|bind\\|default_backend\\|use_backend' /etc/haproxy/haproxy.cfg 2>/dev/null | head -60
-echo "==HAPROXY_LOGS=="
-for f in /var/log/haproxy.log /var/log/haproxy/access.log; do
-  [ -f "$f" ] && tail -50 "$f" && break
-done 2>/dev/null
-`;
+function buildVhostsCmd(proxy: string): string {
+  if (proxy === "apache") {
+    return `echo "==APACHE_VHOSTS=="\napache2ctl -S 2>/dev/null || httpd -S 2>/dev/null || true`;
+  }
+  return "";
+}
+
+function buildConfigCmd(proxy: string, paths: ProxyPaths): string {
+  const prefix = proxy === "nginx" ? "NGINX" : proxy === "apache" ? "APACHE" : proxy.toUpperCase();
+  const grepPatterns: Record<string, string> = {
+    nginx: `'listen\\|server_name\\|proxy_pass\\|upstream\\|return\\|location'`,
+    apache: `'VirtualHost\\|DocumentRoot\\|ProxyPass\\|ProxyPassReverse\\|ServerName\\|Listen\\|<Location'`,
+    caddy: `'reverse_proxy\\|handle_path\\|respond\\|redir\\|route\\|tls'`,
+    traefik: "",
+    haproxy: `'frontend\\|backend\\|listen\\|server\\|bind\\|default_backend\\|use_backend'`,
+  };
+  const grepPat = grepPatterns[proxy] || "";
+  const lines: string[] = [`echo "==${prefix}_CONFIG=="`];
+
+  for (const d of paths.configDirs) {
+    if (grepPat) {
+      lines.push(`[ -d "${d}" ] && grep -rnh ${grepPat} "${d}" 2>/dev/null | head -60`);
+    } else {
+      lines.push(`[ -d "${d}" ] && ls "${d}" 2>/dev/null | head -20`);
+    }
+  }
+  for (const f of paths.configFiles) {
+    if (grepPat) {
+      lines.push(`[ -f "${f}" ] && grep -n ${grepPat} "${f}" 2>/dev/null | head -60`);
+    } else {
+      lines.push(`[ -f "${f}" ] && head -80 "${f}" 2>/dev/null`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function buildValidateCmd(proxy: string, paths: ProxyPaths): string {
+  if (proxy === "caddy") {
+    const lines: string[] = [`echo "==CADDY_VALIDATE=="`];
+    for (const f of paths.configFiles) {
+      lines.push(`[ -f "${f}" ] && caddy validate --config "${f}" 2>&1 && break`);
+    }
+    return lines.join("\n");
+  }
+  return "";
+}
+
+function buildErrorLogCmd(proxy: string, paths: ProxyPaths): string {
+  if (proxy === "caddy" || proxy === "traefik") {
+    return `echo "==${proxy.toUpperCase()}_LOGS=="\njournalctl -u ${paths.unitName} -n 50 --no-pager 2>/dev/null || true`;
+  }
+
+  const prefix = proxy === "nginx" ? "NGINX" : proxy.toUpperCase();
+  const lines: string[] = [`echo "==${prefix}_ERRORLOG=="`];
+
+  if (proxy === "nginx") {
+    for (const f of paths.errorLogs) {
+      lines.push(`[ -f "${f}" ] && tail -50 "${f}" && break`);
+    }
+    lines.push(`journalctl -u nginx -n 50 --no-pager 2>/dev/null | tail -50 || true`);
+  } else if (proxy === "apache") {
+    for (const f of paths.errorLogs) {
+      lines.push(`[ -f "${f}" ] && tail -50 "${f}" && break`);
+    }
+  } else if (proxy === "haproxy") {
+    for (const f of paths.errorLogs) {
+      lines.push(`[ -f "${f}" ] && tail -50 "${f}" && break`);
+    }
+    lines.push(`journalctl -u haproxy -n 50 --no-pager 2>/dev/null | tail -50 || true`);
+  }
+
+  return lines.join("\n");
+}
+
+function buildAccessLogCmd(proxy: string, paths: ProxyPaths): string {
+  if (proxy === "caddy" || proxy === "traefik" || proxy === "haproxy") return "";
+
+  const prefix = proxy === "nginx" ? "NGINX" : "APACHE";
+  const lines: string[] = [`echo "==${prefix}_ACCESS=="`];
+  for (const f of paths.accessLogs) {
+    lines.push(`[ -f "${f}" ] && tail -200 "${f}" && break`);
+  }
+  return lines.join("\n");
+}
+
+function buildProxyScript(proxy: string, paths: ProxyPaths): string[] {
+  return [
+    buildVersionCmd(proxy),
+    buildConfigTestCmd(proxy, paths),
+    buildVhostsCmd(proxy),
+    buildConfigCmd(proxy, paths),
+    buildErrorLogCmd(proxy, paths),
+    buildAccessLogCmd(proxy, paths),
+    buildValidateCmd(proxy, paths),
+  ].filter(Boolean);
+}
+
+function buildScript(forceProxy?: string, overrides?: Record<string, Partial<ProxyPaths>>): string {
+  const lines: string[] = [];
+  lines.push(`echo "==DETECTION=="`);
+
+  if (forceProxy) {
+    lines.push(`echo "FORCED=${forceProxy}"`);
+    lines.push(`command -v ${forceProxy} >/dev/null 2>&1 || echo "NOT_INSTALLED=${forceProxy}"`);
+  } else {
+    lines.push(
+      `for p in nginx apache2 httpd caddy traefik haproxy; do command -v "$p" >/dev/null 2>&1 && echo "FOUND=$p"; done`,
+    );
+    lines.push(
+      `for s in nginx apache2 httpd caddy traefik haproxy; do systemctl is-active "$s" 2>/dev/null | grep -q active && echo "ACTIVE=$s"; done`,
+    );
+  }
+
+  const proxyNames = forceProxy
+    ? [forceProxy]
+    : ["nginx", "apache", "httpd", "caddy", "traefik", "haproxy"];
+
+  for (const p of proxyNames) {
+    const lookup = p === "httpd" ? "apache" : p;
+    const base = DEFAULT_PATHS[lookup];
+    if (!base) continue;
+    const ov = (overrides && overrides[lookup]) || {};
+    const paths: ProxyPaths = {
+      configDirs: ov.configDirs || base.configDirs,
+      configFiles: ov.configFiles || base.configFiles,
+      errorLogs: ov.errorLogs || base.errorLogs,
+      accessLogs: ov.accessLogs || base.accessLogs,
+      unitName: ov.unitName || base.unitName,
+    };
+    const cmds = buildProxyScript(lookup, paths);
+    lines.push(`\nif command -v ${p} >/dev/null 2>&1; then`);
+    for (const c of cmds) {
+      for (const line of c.split("\n")) {
+        lines.push(line);
+      }
+    }
+    lines.push(`fi`);
+  }
+
+  return lines.join("\n");
+}
 
 function section(output: string, name: string): string[] {
   const re = new RegExp(`==${name}==\n([\\s\\S]*?)(?=\\n==|$)`);
@@ -119,47 +251,9 @@ function summarizeAccess(text: string): string[] {
   return result;
 }
 
-function buildScript(proxy?: string): string {
-  const lines: string[] = [];
-
-  lines.push(`echo "==DETECTION=="`);
-
-  if (proxy) {
-    lines.push(`echo "FORCED=${proxy}"`);
-    lines.push(`command -v ${proxy} >/dev/null 2>&1 || echo "NOT_INSTALLED=${proxy}"`);
-  } else {
-    lines.push(
-      `for p in nginx apache2 httpd caddy traefik haproxy; do command -v "$p" >/dev/null 2>&1 && echo "FOUND=$p"; done`,
-    );
-    lines.push(
-      `for s in nginx apache2 httpd caddy traefik haproxy; do systemctl is-active "$s" 2>/dev/null | grep -q active && echo "ACTIVE=$s"; done`,
-    );
-  }
-
-  const proxies = proxy ? [proxy] : ["nginx", "apache2", "httpd", "caddy", "traefik", "haproxy"];
-  const blocks: Record<string, string> = {
-    nginx: NGINX_CMDS,
-    apache2: APACHE_CMDS,
-    httpd: APACHE_CMDS,
-    caddy: CADDY_CMDS,
-    traefik: TRAEFIK_CMDS,
-    haproxy: HAPROXY_CMDS,
-  };
-
-  for (const p of proxies) {
-    const block = blocks[p];
-    if (!block) continue;
-    lines.push(`\nif command -v ${p} >/dev/null 2>&1; then`);
-    lines.push(...block.trim().split("\n"));
-    lines.push(`fi`);
-  }
-
-  return lines.join("\n");
-}
-
 export default tool({
   description:
-    "Detect and debug reverse proxies (nginx, apache, caddy, traefik, haproxy) on a remote server via SSH. Validates config syntax, extracts server blocks / vhosts / upstreams, reads error logs, and summarizes 5xx/4xx from access logs.",
+    "Detect and debug reverse proxies (nginx, apache, caddy, traefik, haproxy) on a remote server via SSH. Validates config syntax, extracts server blocks / vhosts / upstreams, reads error logs, and summarizes 5xx/4xx from access logs. Paths for config and log files are configurable per proxy.",
   args: {
     host: tool.schema
       .string()
@@ -192,6 +286,26 @@ export default tool({
       .describe(
         "Force specific proxy: 'nginx', 'apache', 'caddy', 'traefik', 'haproxy'. Skips auto-detection.",
       ),
+    nginxPaths: tool.schema
+      .string()
+      .optional()
+      .describe("Custom nginx paths JSON: {configDirs:[],configFiles:[],errorLogs:[],accessLogs:[]}"),
+    apachePaths: tool.schema
+      .string()
+      .optional()
+      .describe("Custom apache paths JSON: {configDirs:[],configFiles:[],errorLogs:[],accessLogs:[]}"),
+    caddyPaths: tool.schema
+      .string()
+      .optional()
+      .describe("Custom caddy paths JSON: {configDirs:[],configFiles:[],errorLogs:[],accessLogs:[]}"),
+    traefikPaths: tool.schema
+      .string()
+      .optional()
+      .describe("Custom traefik paths JSON: {configDirs:[],configFiles:[],errorLogs:[],accessLogs:[]}"),
+    haproxyPaths: tool.schema
+      .string()
+      .optional()
+      .describe("Custom haproxy paths JSON: {configDirs:[],configFiles:[],errorLogs:[],accessLogs:[]}"),
   },
   async execute(args, context) {
     const mode = args.mode || "auto";
@@ -206,7 +320,20 @@ export default tool({
       proxyJump: args.proxyJump,
     };
 
-    const script = buildScript(forceProxy);
+    const overrides: Record<string, Partial<ProxyPaths>> = {};
+    for (const p of ["nginx", "apache", "caddy", "traefik", "haproxy"] as const) {
+      const key = `${p}Paths` as keyof typeof args;
+      const val = args[key];
+      if (val) {
+        try {
+          overrides[p] = JSON.parse(val);
+        } catch {
+          return `ERROR: ${key} must be valid JSON matching ProxyPaths structure`;
+        }
+      }
+    }
+
+    const script = buildScript(forceProxy, overrides);
     const raw = sshExec(sshOpts, [script], 120_000);
     const proxy = parseProxyResults(raw);
 
@@ -329,8 +456,8 @@ export default tool({
       }
 
       const errLog = proxy.sections[`${prefix}_ERRORLOG`] || [];
-      const logPaths = proxy.sections[`${prefix}_LOGS`] || [];
-      const allLogs = errLog.length > 0 ? errLog : logPaths;
+      const logJs = proxy.sections[`${prefix}_LOGS`] || [];
+      const allLogs = errLog.length > 0 ? errLog : logJs;
 
       if (allLogs.length > 0) {
         const last10 = allLogs.slice(-10);

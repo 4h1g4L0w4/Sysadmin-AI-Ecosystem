@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin";
-import { getHostTextContext, projectRoot } from "./_memory";
+import { getHostTextContext } from "./_memory";
+import { projectRoot } from "./_root";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import path from "path";

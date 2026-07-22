@@ -1,6 +1,7 @@
 import { execFileSync } from "child_process";
 import path from "path";
 import fs from "fs";
+import { projectRoot } from "./_root";
 
 export interface SshOptions {
   host: string;
@@ -42,21 +43,9 @@ function sshCliArgs(options: SshOptions): string[] {
   return args;
 }
 
-function findRepoRoot(): string | undefined {
-  const candidates = [
-    process.env.OPENCODE_DIRECTORY,
-    process.cwd(),
-  ].filter(Boolean) as string[];
-  for (const dir of candidates) {
-    if (fs.existsSync(path.join(dir, "AGENTS.md"))) return dir;
-  }
-  return undefined;
-}
-
 function auditLog(options: SshOptions, commands: string[]): void {
   try {
-    const root = findRepoRoot();
-    if (!root) return;
+    const root = projectRoot();
     const logDir = path.join(root, "memoria", "events", "audit");
     fs.mkdirSync(logDir, { recursive: true });
     const timestamp = new Date().toISOString();

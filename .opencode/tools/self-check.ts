@@ -1,19 +1,9 @@
 import { tool } from "@opencode-ai/plugin";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import path from "path";
+import { projectRoot } from "./_root";
 
-const ROOT = findRoot();
-
-function findRoot(): string {
-  let dir = process.cwd();
-  for (let i = 0; i < 10; i++) {
-    if (existsSync(path.join(dir, "AGENTS.md"))) return dir;
-    const p = path.dirname(dir);
-    if (p === dir) break;
-    dir = p;
-  }
-  return process.cwd();
-}
+const ROOT = projectRoot();
 
 function ok(label: string, detail?: string): string {
   return `  ✓ ${label}${detail ? ` (${detail})` : ""}`;

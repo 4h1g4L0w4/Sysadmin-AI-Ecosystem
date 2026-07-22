@@ -1,13 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
-import {
-  readToonFile,
-  detectConflicts,
-  sanitizeEntityId,
-  memoryPaths,
-  HostProfile,
-} from "./_memory";
-import { existsSync } from "fs";
-import path from "path";
+import { conflictsHost } from "./_memory";
 
 export default tool({
   description:
@@ -19,23 +11,6 @@ export default tool({
   },
   async execute(args) {
     if (!args.host) return "ERROR: 'host' is required";
-
-    const safeHost = sanitizeEntityId(args.host);
-    const profilePath = path.join(memoryPaths.hosts(), `${safeHost}.toon`);
-
-    if (!existsSync(profilePath)) {
-      return `No profile found for ${args.host}. Run memory-write first.`;
-    }
-
-    const profile = await readToonFile<HostProfile>(profilePath, null!);
-    if (!profile) return `Cannot read profile for ${args.host}.`;
-
-    const conflicts = detectConflicts(profile);
-    if (conflicts.length === 0) return `No conflicts detected for ${args.host}.`;
-
-    const lines = conflicts.map(
-      (c) => `  [${c.severity}] ${c.description} (sources: ${c.sources.join(", ")})`,
-    );
-    return `Conflicts for ${args.host} (${conflicts.length}):\n${lines.join("\n")}`;
+    return await conflictsHost(args.host);
   },
 });

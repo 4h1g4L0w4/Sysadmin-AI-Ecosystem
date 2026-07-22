@@ -1,7 +1,6 @@
 import { tool } from "@opencode-ai/plugin";
-import path from "path";
 import { existsSync } from "fs";
-import { readFile, readdir } from "fs/promises";
+import { readdir } from "fs/promises";
 import {
   ensureMemoryLayout,
   appendObservations,
@@ -9,14 +8,10 @@ import {
   upsertHostProfile,
   renderHostContext,
   compactHostFromObservations,
-  detectStaleFacts,
-  detectConflicts,
-  readToonFile,
-  Observation,
-  HostProfile,
-  sanitizeEntityId,
+  validateObservations,
+  staleHostFacts,
+  conflictsHost,
   memoryPaths,
-  nowIso,
 } from "./_memory";
 
 export default tool({
@@ -84,40 +79,17 @@ export default tool({
         /* ── write-observation ──────────────────────── */
         case "write-observation": {
           if (!host) return "ERROR: 'host' is required for write-observation";
-          let obs: Observation[];
+          let obs: any[];
           try {
             obs = obsRaw ? JSON.parse(obsRaw) : [];
           } catch {
             return "ERROR: 'observations' must be valid JSON array of Observation objects";
           }
-          if (!Array.isArray(obs) || obs.length === 0) {
-            return "ERROR: 'observations' must be a non-empty array";
-          }
-
-          const requiredFields = ["id", "key", "value", "source", "observed_at", "confidence", "ttl_days"];
-          for (let i = 0; i < obs.length; i++) {
-            const o = obs[i];
-            const missing = requiredFields.filter((f) => o[f] === undefined || o[f] === null);
-            if (missing.length > 0) {
-              return `ERROR: observation #${i} (id='${o.id || "?"}') missing required fields: ${missing.join(", ")}`;
-            }
-            if (typeof o.confidence !== "number" || o.confidence < 0 || o.confidence > 1) {
-              return `ERROR: observation #${i} confidence must be a number between 0 and 1, got ${o.confidence}`;
-            }
-            if (typeof o.ttl_days !== "number" || o.ttl_days < 0) {
-              return `ERROR: observation #${i} ttl_days must be a non-negative number, got ${o.ttl_days}`;
-            }
-          }
-
-          // Ensure valid host entity on each
-          for (const o of obs) {
-            if (!o.entity) o.entity = `host:${host}`;
-          }
-
+          const err = validateObservations(obs, host);
+          if (err) return err;
           await appendObservations(obs);
           await upsertHostProfile(host, obs);
           await renderHostContext(host);
-
           return `Written ${obs.length} observations for ${host}. Entity and view updated.`;
         }
 
@@ -140,37 +112,13 @@ export default tool({
         /* ── stale ──────────────────────────────────── */
         case "stale": {
           if (!host) return "ERROR: 'host' is required for stale";
-          const safeHost = sanitizeEntityId(host);
-          const profilePath = path.join(memoryPaths.hosts(), `${safeHost}.toon`);
-          if (!existsSync(profilePath)) {
-            return `No profile found for ${host}. Run write-observation first.`;
-          }
-          const profile = await readToonFile<HostProfile>(profilePath, null!);
-          if (!profile) return `Cannot read profile for ${host}.`;
-          const stale = detectStaleFacts(profile);
-          if (stale.length === 0) return `No stale facts for ${host}.`;
-          const lines = stale.map(
-            (f) => `  ${f.key} = ${f.value} (observed ${f.observed_at}, TTL ${f.ttl_days}d, expired)`,
-          );
-          return `Stale facts for ${host} (${stale.length}):\n${lines.join("\n")}`;
+          return await staleHostFacts(host);
         }
 
         /* ── conflicts ──────────────────────────────── */
         case "conflicts": {
           if (!host) return "ERROR: 'host' is required for conflicts";
-          const safeHost = sanitizeEntityId(host);
-          const profilePath = path.join(memoryPaths.hosts(), `${safeHost}.toon`);
-          if (!existsSync(profilePath)) {
-            return `No profile found for ${host}. Run write-observation first.`;
-          }
-          const profile = await readToonFile<HostProfile>(profilePath, null!);
-          if (!profile) return `Cannot read profile for ${host}.`;
-          const conflicts = detectConflicts(profile);
-          if (conflicts.length === 0) return `No conflicts detected for ${host}.`;
-          const lines = conflicts.map(
-            (c) => `  [${c.severity}] ${c.description} (sources: ${c.sources.join(", ")})`,
-          );
-          return `Conflicts for ${host} (${conflicts.length}):\n${lines.join("\n")}`;
+          return await conflictsHost(host);
         }
 
         default:

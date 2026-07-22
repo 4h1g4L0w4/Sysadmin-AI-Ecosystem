@@ -1,13 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
-import {
-  readToonFile,
-  detectStaleFacts,
-  sanitizeEntityId,
-  memoryPaths,
-  HostProfile,
-} from "./_memory";
-import { existsSync } from "fs";
-import path from "path";
+import { staleHostFacts } from "./_memory";
 
 export default tool({
   description:
@@ -19,23 +11,6 @@ export default tool({
   },
   async execute(args) {
     if (!args.host) return "ERROR: 'host' is required";
-
-    const safeHost = sanitizeEntityId(args.host);
-    const profilePath = path.join(memoryPaths.hosts(), `${safeHost}.toon`);
-
-    if (!existsSync(profilePath)) {
-      return `No profile found for ${args.host}. Run memory-write first.`;
-    }
-
-    const profile = await readToonFile<HostProfile>(profilePath, null!);
-    if (!profile) return `Cannot read profile for ${args.host}.`;
-
-    const stale = detectStaleFacts(profile);
-    if (stale.length === 0) return `No stale facts for ${args.host}.`;
-
-    const lines = stale.map(
-      (f) => `  ${f.key} = ${f.value} (observed ${f.observed_at}, TTL ${f.ttl_days}d, expired)`,
-    );
-    return `Stale facts for ${args.host} (${stale.length}):\n${lines.join("\n")}`;
+    return await staleHostFacts(args.host);
   },
 });
