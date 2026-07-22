@@ -1,8 +1,12 @@
 # Sysadmin AI - Reglas del proyecto
 
+## Auto-sync del ecosistema
+
+Al comenzar cada nuevo chat con el usuario, ejecutar **`opencode-sync`** con `apply=true` para sincronizar `opencode.json` con las tools y skills reales en disco (producto de `git pull`). Si falla (sin git, merge conflict, etc.), reportar el error y continuar igual.
+
 ## Auto-diagnóstico del ecosistema
 
-Al comenzar un chat con el usuario, ejecutar **`self-check`** automáticamente para verificar que el ecosistema esté funcionando correctamente (SSH keys, memoria TOON, tools registradas).
+Después del sync, ejecutar **`self-check`** automáticamente para verificar que el ecosistema esté funcionando correctamente (SSH keys, memoria TOON, tools registradas).
 
 Si durante una interacción ocurre un error inesperado (ej: "tool not found", el output de una tool no es el esperado, o la tool reporta un error interno), ejecutar **`self-check`** para diagnosticar el ecosistema antes de asumir que el problema está en el servidor remoto.
 
@@ -28,29 +32,31 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 
 ## Flujo de trabajo
 
-1. **Auto-diagnóstico inicial** → corré `self-check` al comenzar el chat. Si hay fallos, reportalos y preguntá si querés continuar.
+1. **Auto-sync inicial** → corré `opencode-sync apply=true` para sincronizar tools y skills con el repo. Si falla, reportalo y continuá igual.
 
-2. **Host nuevo / desconocido** → corré `recon` primero para mapear el servidor.
+2. **Auto-diagnóstico inicial** → corré `self-check`. Si hay fallos, reportalos y preguntá si querés continuar.
 
-3. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
+3. **Host nuevo / desconocido** → corré `recon` primero para mapear el servidor.
+
+4. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
    - Si no hay contexto TOON, caé a `./memoria/hosts/<host>.md` (legacy).
    - **Si `memory-stale host=<host>` detecta facts vencidos**, ejecutá automáticamente las tools necesarias (debug, recon, etc.) para refrescar los facts vencidos antes de continuar con el diagnóstico. No esperés a que el usuario lo pida.
 
-4. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.).
+5. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.).
 
-5. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
+6. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
 
-6. **Acumulá observaciones, NO escribas después de cada tool.** Mantené un array en memoria con las observaciones más relevantes de todas las tools ejecutadas. Al final de todo el diagnóstico, hacé **un único** `memory-write host=<host> observations=<JSON>`.
+7. **Acumulá observaciones, NO escribas después de cada tool.** Mantené un array en memoria con las observaciones más relevantes de todas las tools ejecutadas. Al final de todo el diagnóstico, hacé **un único** `memory-write host=<host> observations=<JSON>`.
    - Cada observación debe incluir: `id`, `entity`, `key`, `value`, `source`, `observed_at`, `confidence`, `ttl_days`.
    - **NUNCA guardar secretos, passwords, tokens ni IPs reales.**
 
-7. **Después del write, ejecutá automáticamente `memory-conflicts host=<host>`.** Si hay contradicciones (ej: servicio activo pero puerto cerrado), incluilas en el resumen al usuario.
+8. **Después del write, ejecutá automáticamente `memory-conflicts host=<host>`.** Si hay contradicciones (ej: servicio activo pero puerto cerrado), incluilas en el resumen al usuario.
 
-8. **Compactación inteligente.** Si las observaciones escritas son redundantes (repiten facts ya existentes en el perfil con los mismos valores), ejecutá automáticamente `memory-compact host=<host>` para limpiar el perfil y dejar solo datos nuevos.
+9. **Compactación inteligente.** Si las observaciones escritas son redundantes (repiten facts ya existentes en el perfil con los mismos valores), ejecutá automáticamente `memory-compact host=<host>` para limpiar el perfil y dejar solo datos nuevos.
 
-9. **Si resolviste un problema** → registralo como incidente TOON con `memory-write`.
+10. **Si resolviste un problema** → registralo como incidente TOON con `memory-write`.
 
-9. **Al finalizar, presentá un resumen estructurado:**
+11. **Al finalizar, presentá un resumen estructurado:**
    ```
    ── Resumen: <host> ──
    Estado: <ok / warning / critical>
@@ -140,7 +146,7 @@ Podés ejecutar **múltiples tools** en una misma interacción si el pedido lo a
 | "todo lo que sepas de X" | `memory-read-context` + todas las tools relevantes según el contexto |
 
 Al componer:
-- Siempre empezar con `self-check` si es el inicio del chat.
+- Siempre empezar con `opencode-sync apply=true` + `self-check` si es el inicio del chat.
 - Si el host es **conocido**, leé contexto primero con `memory-read-context` y verificá facts vencidos con `memory-stale`.
 - Si el host es **desconocido**, empezá con `recon`.
 - Acumulá observaciones en memoria y escribí **una sola vez** al final.
