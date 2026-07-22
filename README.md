@@ -37,6 +37,7 @@
   - [patch-status](#-patch-status)
   - [proxy-debug](#-proxy-debug)
   - [memory](#-memory)
+  - [opencode-sync](#-opencode-sync)
 - [Memoria Persistente (TOON)](#-memoria-persistente-toon)
 - [Migración desde Markdown](#-migración-desde-markdown)
 - [Flujo de Trabajo](#-flujo-de-trabajo)
@@ -61,7 +62,7 @@
 - 📦 Estado de parches y actualizaciones — paquetes pendientes, seguridad, compatibilidad
 - 🌐 Diagnóstico de reverse proxies — nginx/apache/caddy/traefik/haproxy, config, logs de error, 5xx/4xx
 - 🧠 **Memoria persistente TOON** con auto-roles, relaciones entre entidades, detección de conflictos, compactación inteligente y evidencia truncada
-- ⚡ **Comportamiento autónomo del agente**: batch write, self-check automático, detección de contradicciones, refresco de facts vencidos, fallback SSH por password y resumen estructurado post-diagnóstico
+- ⚡ **Comportamiento autónomo del agente**: auto-sync de tools al iniciar chat, batch write, self-check automático, detección de contradicciones, refresco de facts vencidos, fallback SSH por password y resumen estructurado post-diagnóstico
 
 Todo **read-only** y **sin sudo** — seguro para entornos de producción.
 
@@ -153,6 +154,7 @@ sysadmin-ai-ecosystem/
     │   ├── memory-stale.ts        ← Listar facts vencidos
     │   ├── memory-conflicts.ts    ← Detectar contradicciones
     │   ├── memory-relation.ts     ← Gestionar relaciones entre entidades
+    │   ├── opencode-sync.ts       ← Sincronizar tools con opencode.json
     │   ├── debug.ts
     │   ├── recon.ts
     │   ├── docker-debug.ts
@@ -373,6 +375,18 @@ Gestión de memoria persistente en formato TOON. Lee/escribe observaciones, cons
 - **add-relation** — crea una relación dirigida entre dos entidades (ej: host → service)
 - **list-relations** — lista relaciones de una entidad (entrantes, salientes o ambas)
 
+### 🔄 opencode-sync
+
+Sincroniza `opencode.json` con las tools y skills reales en disco. Se ejecuta automáticamente al iniciar cada chat (via AGENTS.md) para asegurar que el agente siempre use la última versión de las herramientas después de un `git pull`.
+
+| Parámetro | Tipo | Default | Descripción |
+|-----------|------|---------|-------------|
+| `pull` | `boolean?` | `true` | Ejecutar `git pull --ff-only` antes de sincronizar |
+| `apply` | `boolean?` | `false` | Aplicar cambios en `opencode.json` (si es `false`, solo muestra diff) |
+| `branch` | `string?` | `main` | Rama para git pull |
+
+**Salida:** Resumen de cambios detectados (tools agregadas/quitadas, skills validadas) o confirmación de que ya está sincronizado.
+
 ---
 
 ## 🧠 Memoria Persistente (TOON)
@@ -521,6 +535,8 @@ graph TD
 | *"vinculá el host db1 con el servicio postgresql"* | `memory action=add-relation entityFrom=host:db1 type=runs entityTo=service:postgresql` |
 | *"mostrame las relaciones del host web1"* | `memory action=list-relations host=web1 direction=both` |
 | *"verificá que la instalación esté correcta"* | `self-check(host: "localhost")` → checkea SSH, herramientas, dependencias |
+| *"sincronizá las tools después del pull"* | `opencode-sync apply=true` → actualiza `opencode.json` con tools nuevas/quitadas |
+| *"mostrame qué tools se agregaron o sacaron"* | `opencode-sync` (sin `apply`) → muestra diff sin modificar |
 
 ---
 
