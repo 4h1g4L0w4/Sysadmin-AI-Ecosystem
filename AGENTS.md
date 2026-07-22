@@ -1,5 +1,13 @@
 # Sysadmin AI - Reglas del proyecto
 
+## Auto-diagnóstico del ecosistema
+
+Al comenzar un chat con el usuario, ejecutar **`self-check`** automáticamente para verificar que el ecosistema esté funcionando correctamente (SSH keys, memoria TOON, tools registradas).
+
+Si durante una interacción ocurre un error inesperado (ej: "tool not found", el output de una tool no es el esperado, o la tool reporta un error interno), ejecutar **`self-check`** para diagnosticar el ecosistema antes de asumir que el problema está en el servidor remoto.
+
+Si `self-check` reporta fallos, presentarlos al usuario antes de continuar con cualquier diagnóstico.
+
 ## Selección automática de tools
 
 El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta automáticamente según su mensaje:
@@ -19,16 +27,43 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 
 ## Flujo de trabajo
 
-1. **Host nuevo / desconocido** → corré `recon` primero para mapear el servidor.
-2. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
+1. **Auto-diagnóstico inicial** → corré `self-check` al comenzar el chat. Si hay fallos, reportalos y preguntá si querés continuar.
+
+2. **Host nuevo / desconocido** → corré `recon` primero para mapear el servidor.
+
+3. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
    - Si no hay contexto TOON, caé a `./memoria/hosts/<host>.md` (legacy).
-3. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.).
-4. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
-5. **Siempre al finalizar** → guardá observaciones relevantes con `memory-write host=<host> observations=<JSON>`.
+   - **Si `memory-stale host=<host>` detecta facts vencidos**, ejecutá automáticamente las tools necesarias (debug, recon, etc.) para refrescar los facts vencidos antes de continuar con el diagnóstico. No esperés a que el usuario lo pida.
+
+4. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.).
+
+5. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
+
+6. **Acumulá observaciones, NO escribas después de cada tool.** Mantené un array en memoria con las observaciones más relevantes de todas las tools ejecutadas. Al final de todo el diagnóstico, hacé **un único** `memory-write host=<host> observations=<JSON>`.
    - Cada observación debe incluir: `id`, `entity`, `key`, `value`, `source`, `observed_at`, `confidence`, `ttl_days`.
    - **NUNCA guardar secretos, passwords, tokens ni IPs reales.**
-6. **Si resolviste un problema** → registralo como incidente TOON con `memory-write`.
-7. **No confiar en facts vencidos** → corré `memory-stale host=<host>` antes de reusar facts viejos.
+
+7. **Después del write, ejecutá automáticamente `memory-conflicts host=<host>`.** Si hay contradicciones (ej: servicio activo pero puerto cerrado), incluilas en el resumen al usuario.
+
+8. **Si resolviste un problema** → registralo como incidente TOON con `memory-write`.
+
+9. **Al finalizar, presentá un resumen estructurado:**
+   ```
+   ── Resumen: <host> ──
+   Estado: <ok / warning / critical>
+   Servicios relevantes: <lista>
+   Riesgos activos: <lista>
+   Facts refrescados: <lista>
+   Conflictos detectados: <lista>
+   Acciones recomendadas: <lista>
+   ```
+
+## Manejo de errores SSH
+
+Si una tool falla con `SSH_ERROR`, timeout o conexión rechazada:
+1. Informá el error específico al usuario (timeout, conexión rechazada, autenticación, etc.).
+2. Preguntale qué hacer: intentar con otro puerto, otro usuario, o cancelar la operación.
+3. No reintentes automáticamente sin confirmación del usuario.
 
 ## Memoria TOON (canónica)
 
@@ -50,8 +85,9 @@ memoria/
 - **entities/** = estado consolidado actual
 - **views/** = contexto generado para consumo rápido de la IA
 - La IA lee **views/host-context/** primero. Si no existe, genera desde entities.
-- Después de cada tool, escribir observaciones con `memory-write`.
-- No confiar en facts vencidos sin refrescarlos.
+- Acumulá observaciones de múltiples tools y escribí **una sola vez** al final. No escribir después de cada tool individual.
+- Usá `memory-stale` para refrescar facts vencidos antes de diagnosticar.
+- Usá `memory-conflicts` después de escribir para detectar contradicciones.
 - Si `memory-*` falla, las tools de diagnóstico siguen funcionando.
 
 ## Prioridad de selección
@@ -80,15 +116,18 @@ Podés ejecutar **múltiples tools** en una misma interacción si el pedido lo a
 
 | Pedido del usuario | Tools a ejecutar |
 |---|---|
-| "revisá el server X completo" | `memory-read-context` + `debug` + `recon` + `patch-status` (modo quick) |
+| "revisá el server X completo" | `self-check` + `memory-read-context` + `debug` + `recon` + `patch-status` (modo quick) |
 | "auditá seguridad + parches en X" | `security-audit` + `patch-status` |
 | "diagnóstico completo de red y proxy" | `network-debug` + `proxy-debug` |
 | "todo lo que sepas de X" | `memory-read-context` + todas las tools relevantes según el contexto |
 
 Al componer:
-- Si el host es **conocido**, leé contexto primero con `memory-read-context`
-- Si el host es **desconocido**, empezá con `recon`
-- Consolidá los resultados en una respuesta única
+- Siempre empezar con `self-check` si es el inicio del chat.
+- Si el host es **conocido**, leé contexto primero con `memory-read-context` y verificá facts vencidos con `memory-stale`.
+- Si el host es **desconocido**, empezá con `recon`.
+- Acumulá observaciones en memoria y escribí **una sola vez** al final.
+- Después del write, ejecutá `memory-conflicts` y presentá resultados.
+- Consolidá los resultados en una respuesta única con el resumen estructurado.
 
 ## Catch-all
 
