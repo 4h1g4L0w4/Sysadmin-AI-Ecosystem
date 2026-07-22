@@ -113,6 +113,13 @@ export interface StaleFactView {
   expired_since: string;
 }
 
+export interface HostRelationView {
+  from: string;
+  relation: string;
+  to: string;
+  observed_at: string;
+}
+
 export interface HostContext {
   schema: string;
   entity: string;
@@ -121,6 +128,7 @@ export interface HostContext {
   current_services: HostServiceView[];
   current_ports: HostPortView[];
   open_risks: HostRiskView[];
+  relations: HostRelationView[];
   stale_facts: StaleFactView[];
   recommended_next_tools: string[];
 }
@@ -644,6 +652,12 @@ export async function renderHostContext(host: string): Promise<void> {
         summary: r.summary,
         last_seen: r.observed_at,
       })),
+    relations: profile.relations.map((r) => ({
+      from: r.from,
+      relation: r.relation,
+      to: r.to,
+      observed_at: r.observed_at,
+    })),
     stale_facts: stale,
     recommended_next_tools: recommendTools(health.health, stale, profile),
   };
