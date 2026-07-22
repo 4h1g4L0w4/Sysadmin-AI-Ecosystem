@@ -17,6 +17,7 @@
     "./.opencode/tools/memory-compact.ts",
     "./.opencode/tools/memory-stale.ts",
     "./.opencode/tools/memory-conflicts.ts",
+    "./.opencode/tools/memory-relation.ts",
     "./.opencode/tools/self-check.ts"
   ],
   "skills": {

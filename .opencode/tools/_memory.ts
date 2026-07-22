@@ -180,9 +180,14 @@ export function nowIso(): string {
 
 export function obsWeekKey(date?: Date): string {
   const d = date || new Date();
-  const year = d.getFullYear();
+  const target = new Date(d);
+  target.setHours(0, 0, 0, 0);
+  // ISO week: Thursday-based. Find the Thursday of the same week.
+  const day = target.getDay() || 7; // Mon=1 .. Sun=7
+  target.setDate(target.getDate() + 4 - day); // Thursday of the same ISO week
+  const year = target.getFullYear();
   const jan1 = new Date(year, 0, 1);
-  const days = Math.floor((d.getTime() - jan1.getTime()) / 86400000);
+  const days = Math.floor((target.getTime() - jan1.getTime()) / 86400000);
   const week = Math.ceil((days + jan1.getDay() + 1) / 7);
   return `${year}-W${String(week).padStart(2, "0")}`;
 }
@@ -227,6 +232,8 @@ export async function ensureMemoryLayout(): Promise<void> {
   }
 }
 
+const MAX_EVIDENCE_LENGTH = 5_000;
+
 /* ── Observations ───────────────────────────────────────────────── */
 
 export async function appendObservations(observations: Observation[]): Promise<void> {
@@ -234,7 +241,9 @@ export async function appendObservations(observations: Observation[]): Promise<v
 
   const cleaned: Observation[] = observations.map((o) => ({
     ...o,
-    evidence: o.evidence ? redactSecrets(o.evidence) : undefined,
+    evidence: o.evidence
+      ? redactSecrets(o.evidence).slice(0, MAX_EVIDENCE_LENGTH)
+      : undefined,
   }));
 
   const week = obsWeekKey();
@@ -260,6 +269,12 @@ export async function appendObservations(observations: Observation[]): Promise<v
 
 /* ── Host entity helpers (inside the upsert / merge logic) ──────── */
 
+function newerOrBetter(incDate: string, curDate: string, incConf: number, curConf: number): boolean {
+  const inc = new Date(incDate).getTime();
+  const cur = new Date(curDate).getTime();
+  return inc > cur || (inc === cur && incConf > curConf);
+}
+
 function mergeServices(
   existing: ServiceRow[],
   incoming: ServiceRow[],
@@ -269,7 +284,7 @@ function mergeServices(
   for (const s of incoming) {
     const key = s.name;
     const cur = map.get(key);
-    if (!cur || new Date(s.observed_at) >= new Date(cur.observed_at)) {
+    if (!cur || newerOrBetter(s.observed_at, cur.observed_at, s.confidence, cur.confidence)) {
       map.set(key, s);
     }
   }
@@ -282,7 +297,7 @@ function mergePorts(existing: PortRow[], incoming: PortRow[]): PortRow[] {
   for (const p of incoming) {
     const key = `${p.proto}:${p.port}`;
     const cur = map.get(key);
-    if (!cur || new Date(p.observed_at) >= new Date(cur.observed_at)) {
+    if (!cur || newerOrBetter(p.observed_at, cur.observed_at, p.confidence, cur.confidence)) {
       map.set(key, p);
     }
   }
@@ -294,7 +309,7 @@ function mergeFacts(existing: FactRow[], incoming: FactRow[]): FactRow[] {
   for (const f of existing) map.set(f.key, f);
   for (const f of incoming) {
     const cur = map.get(f.key);
-    if (!cur || new Date(f.observed_at) >= new Date(cur.observed_at)) {
+    if (!cur || newerOrBetter(f.observed_at, cur.observed_at, f.confidence, cur.confidence)) {
       map.set(f.key, f);
     }
   }
@@ -306,7 +321,7 @@ function mergeRisks(existing: RiskRow[], incoming: RiskRow[]): RiskRow[] {
   for (const r of existing) map.set(r.id, r);
   for (const r of incoming) {
     const cur = map.get(r.id);
-    if (!cur || new Date(r.observed_at) >= new Date(cur.observed_at)) {
+    if (!cur || newerOrBetter(r.observed_at, cur.observed_at, r.confidence, cur.confidence)) {
       map.set(r.id, r);
     }
   }
@@ -322,7 +337,7 @@ function mergeRelations(
   for (const r of incoming) {
     const key = `${r.from}|${r.relation}|${r.to}`;
     const cur = map.get(key);
-    if (!cur || new Date(r.observed_at) >= new Date(cur.observed_at)) {
+    if (!cur || newerOrBetter(r.observed_at, cur.observed_at, r.confidence, cur.confidence)) {
       map.set(key, r);
     }
   }
@@ -386,6 +401,50 @@ function obsToRisk(o: Observation): RiskRow | null {
   };
 }
 
+/* ── Role derivation ────────────────────────────────────────────── */
+
+const SERVICE_ROLE_MAP: Record<string, string> = {
+  nginx: "reverse-proxy",
+  apache2: "reverse-proxy",
+  httpd: "reverse-proxy",
+  caddy: "reverse-proxy",
+  traefik: "reverse-proxy",
+  haproxy: "reverse-proxy",
+  docker: "container-host",
+  containerd: "container-host",
+  kubelet: "kubernetes-node",
+  kubectl: "kubernetes-node",
+  postgresql: "database-host",
+  mysqld: "database-host",
+  mariadb: "database-host",
+  mongod: "database-host",
+  redis: "cache-host",
+  "redis-server": "cache-host",
+  memcached: "cache-host",
+  jenkins: "ci-cd",
+  prometheus: "monitoring",
+  node_exporter: "monitoring",
+  grafana: "monitoring",
+  influxdb: "monitoring",
+  telegraf: "monitoring",
+};
+
+function deriveRoles(services: ServiceRow[], existingRoles: string[]): string[] {
+  if (existingRoles.length > 0) return existingRoles;
+  const derived = new Set<string>();
+  for (const s of services) {
+    const role = SERVICE_ROLE_MAP[s.name];
+    if (role) derived.add(role);
+  }
+  if (derived.size === 0) return [];
+  // If hosting apps + database, call it "app-host" instead of the individual roles
+  const hasDb = derived.has("database-host") || derived.has("cache-host");
+  const hasProxy = derived.has("reverse-proxy");
+  const hasContainers = derived.has("container-host") || derived.has("kubernetes-node");
+  if (hasProxy && hasContainers && hasDb) return ["app-host"];
+  return [...derived].sort();
+}
+
 /* ── upsertHostProfile ───────────────────────────────────────────── */
 
 export async function upsertHostProfile(
@@ -435,6 +494,7 @@ export async function upsertHostProfile(
   profile.ports = mergePorts(profile.ports, newPorts);
   profile.facts = mergeFacts(profile.facts, newFacts);
   profile.known_risks = mergeRisks(profile.known_risks, newRisks);
+  profile.roles = deriveRoles(profile.services, profile.roles);
 
   await writeToonFile(filePath, profile);
   return profile;
@@ -725,6 +785,18 @@ export async function conflictsHost(host: string): Promise<string> {
     (c) => `  [${c.severity}] ${c.description} (sources: ${c.sources.join(", ")})`,
   );
   return `Conflicts for ${host} (${conflicts.length}):\n${lines.join("\n")}`;
+}
+
+/* ── Redundancy detection ────────────────────────────────────────── */
+
+export function hasRedundantObservations(profile: HostProfile, observations: Observation[]): boolean {
+  if (observations.length === 0) return false;
+  let redundant = 0;
+  for (const o of observations) {
+    const existing = profile.facts.find((f) => f.key === o.key && f.value === o.value);
+    if (existing) redundant++;
+  }
+  return redundant > observations.length / 2;
 }
 
 /* ── Exports for external integration ────────────────────────────── */

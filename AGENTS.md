@@ -24,6 +24,7 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 | "auditá la seguridad" / "Lynis" / "vulnerabilidades" / "hardening" / "security audit" / "CIS" | **security-audit** |
 | "actualizaciones" / "paquetes" / "upgrade" / "atrasado" / "parches" / "patch" / "qué updates hay pendientes" | **patch-status** |
 | "proxy" / "nginx" / "apache" / "caddy" / "reverse proxy" / "no responde" / "502" / "504" / "bad gateway" / "gateway timeout" / "web server" | **proxy-debug** |
+| "relación" / "depende" / "conecta" / "relacioná" / "este host se conecta a" / dependencia entre hosts" | **memory-relation** |
 
 ## Flujo de trabajo
 
@@ -45,7 +46,9 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 
 7. **Después del write, ejecutá automáticamente `memory-conflicts host=<host>`.** Si hay contradicciones (ej: servicio activo pero puerto cerrado), incluilas en el resumen al usuario.
 
-8. **Si resolviste un problema** → registralo como incidente TOON con `memory-write`.
+8. **Compactación inteligente.** Si las observaciones escritas son redundantes (repiten facts ya existentes en el perfil con los mismos valores), ejecutá automáticamente `memory-compact host=<host>` para limpiar el perfil y dejar solo datos nuevos.
+
+9. **Si resolviste un problema** → registralo como incidente TOON con `memory-write`.
 
 9. **Al finalizar, presentá un resumen estructurado:**
    ```
@@ -57,6 +60,21 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
    Conflictos detectados: <lista>
    Acciones recomendadas: <lista>
    ```
+
+## Relaciones entre hosts
+
+Cuando estés diagnosticando un host, preguntale al usuario si ese host tiene relación con otros (ej: "este host depende de otro?", "a qué servidores proxy pasa tráfico?", "está conectado a tal base de datos?").
+
+Si el usuario confirma una relación, ejecutá **`memory-relation from=<host> relation=<tipo> to=<otro-host>`** para persistirla.
+
+Tipos de relación soportados:
+- `proxiesa` — este host actúa como proxy de otro
+- `depende-de` — este host depende de otro (ej: app → database)
+- `conecta-a` — conexión de red directa
+- `balancea-a` — este host balancea tráfico hacia otro
+- `es-clon-de` — servidor duplicado (HA/failover)
+
+Las relaciones se muestran automáticamente en el contexto TOON del host para que estén disponibles en futuros diagnósticos.
 
 ## Manejo de errores SSH
 
