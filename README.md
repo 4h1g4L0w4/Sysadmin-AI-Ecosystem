@@ -420,34 +420,48 @@ graph TD
 
 ## ⚡ Instalación
 
+### Una línea (Linux/macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/4h1g4L0w4/Sysadmin-AI-Ecosystem/main/install.sh | bash
+```
+
+O con wget:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/4h1g4L0w4/Sysadmin-AI-Ecosystem/main/install.sh | bash
+```
+
+### Una línea (Windows PowerShell)
+
+```powershell
+powershell -ExecutionPolicy RemoteSigned -Command "iwr -useb https://raw.githubusercontent.com/4h1g4L0w4/Sysadmin-AI-Ecosystem/main/install.ps1 | iex"
+```
+
+### Manual
+
+| Paso | Comando |
+|------|---------|
+| Clonar | `git clone https://github.com/4h1g4L0w4/Sysadmin-AI-Ecosystem.git && cd Sysadmin-AI-Ecosystem` |
+| Dependencias | `cd .opencode && npm install && cd ..` |
+| Claves SSH | `cp ~/.ssh/id_ed25519 ssh-keys/` |
+| Credenciales | `cp .env.example .env` (opcional, solo Digifort) |
+| Iniciar | `opencode` |
+
 ### Requisitos
 
-- [OpenCode](https://opencode.ai) instalado (`npm install -g @opencode-ai/cli` o vía Bun)
+- [Git](https://git-scm.com)
+- [Node.js](https://nodejs.org) 18+
+- [OpenCode](https://opencode.ai) CLI: `npm install -g @opencode-ai/cli`
 - **SSH agent** cargado con la clave (si tiene passphrase):
   ```bash
   eval $(ssh-agent) && ssh-add ~/.ssh/id_ed25519
   ```
-- **Opcional**: Archivo `.env` con `DIGIFORT_USER` y `DIGIFORT_PASS` para la tool `digifort`
 - **Opcional**: `sshpass` para autenticación por password:
   ```bash
   sudo apt install sshpass   # Debian/Ubuntu
   brew install sshpass       # macOS
   ```
-
-### Setup rápido
-
-```bash
-git clone <repo-url> && cd sysadmin-ai-ecosystem
-
-# Poner tus claves SSH
-cp ~/.ssh/id_ed25519 ssh-keys/
-
-# Configurar credenciales Digifort (opcional)
-cp .env.example .env   # y editá DIGIFORT_USER / DIGIFORT_PASS
-
-# Abrir opencode
-opencode
-```
 
 ---
 
