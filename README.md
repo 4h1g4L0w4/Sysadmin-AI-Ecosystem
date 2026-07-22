@@ -65,6 +65,53 @@ Todo **read-only** y **sin sudo** — seguro para entornos de producción.
 
 ---
 
+## ⚡ Instalación
+
+### Una línea (Linux/macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/4h1g4L0w4/Sysadmin-AI-Ecosystem/main/install.sh | bash
+```
+
+O con wget:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/4h1g4L0w4/Sysadmin-AI-Ecosystem/main/install.sh | bash
+```
+
+### Una línea (Windows PowerShell)
+
+```powershell
+powershell -ExecutionPolicy RemoteSigned -Command "iwr -useb https://raw.githubusercontent.com/4h1g4L0w4/Sysadmin-AI-Ecosystem/main/install.ps1 | iex"
+```
+
+### Manual
+
+| Paso | Comando |
+|------|---------|
+| Clonar | `git clone https://github.com/4h1g4L0w4/Sysadmin-AI-Ecosystem.git && cd Sysadmin-AI-Ecosystem` |
+| Dependencias | `cd .opencode && npm install && cd ..` |
+| Claves SSH | `cp ~/.ssh/id_ed25519 ssh-keys/` |
+| Credenciales | `cp .env.example .env` (opcional, solo Digifort) |
+| Iniciar | `opencode` |
+
+### Requisitos
+
+- [Git](https://git-scm.com)
+- [Node.js](https://nodejs.org) 18+
+- [OpenCode](https://opencode.ai) CLI: `npm install -g @opencode-ai/cli`
+- **SSH agent** cargado con la clave (si tiene passphrase):
+  ```bash
+  eval $(ssh-agent) && ssh-add ~/.ssh/id_ed25519
+  ```
+- **Opcional**: `sshpass` para autenticación por password:
+  ```bash
+  sudo apt install sshpass   # Debian/Ubuntu
+  brew install sshpass       # macOS
+  ```
+
+---
+
 ## 🏗️ Arquitectura
 
 ```
@@ -415,55 +462,6 @@ graph TD
     I --> K[Fin]
     J --> K
 ```
-
----
-
-## ⚡ Instalación
-
-### Una línea (Linux/macOS)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/4h1g4L0w4/Sysadmin-AI-Ecosystem/main/install.sh | bash
-```
-
-O con wget:
-
-```bash
-wget -qO- https://raw.githubusercontent.com/4h1g4L0w4/Sysadmin-AI-Ecosystem/main/install.sh | bash
-```
-
-### Una línea (Windows PowerShell)
-
-```powershell
-powershell -ExecutionPolicy RemoteSigned -Command "iwr -useb https://raw.githubusercontent.com/4h1g4L0w4/Sysadmin-AI-Ecosystem/main/install.ps1 | iex"
-```
-
-### Manual
-
-| Paso | Comando |
-|------|---------|
-| Clonar | `git clone https://github.com/4h1g4L0w4/Sysadmin-AI-Ecosystem.git && cd Sysadmin-AI-Ecosystem` |
-| Dependencias | `cd .opencode && npm install && cd ..` |
-| Claves SSH | `cp ~/.ssh/id_ed25519 ssh-keys/` |
-| Credenciales | `cp .env.example .env` (opcional, solo Digifort) |
-| Iniciar | `opencode` |
-
-### Requisitos
-
-- [Git](https://git-scm.com)
-- [Node.js](https://nodejs.org) 18+
-- [OpenCode](https://opencode.ai) CLI: `npm install -g @opencode-ai/cli`
-- **SSH agent** cargado con la clave (si tiene passphrase):
-  ```bash
-  eval $(ssh-agent) && ssh-add ~/.ssh/id_ed25519
-  ```
-- **Opcional**: `sshpass` para autenticación por password:
-  ```bash
-  sudo apt install sshpass   # Debian/Ubuntu
-  brew install sshpass       # macOS
-  ```
-
----
 
 ## 💡 Ejemplos de Uso
 
