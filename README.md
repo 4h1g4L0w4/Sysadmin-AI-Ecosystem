@@ -10,8 +10,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/Tools-11-7C3AED?style=flat-square">
-  <img src="https://img.shields.io/badge/Skills-5-22C55E?style=flat-square">
+  <img src="https://img.shields.io/badge/Tools-17-7C3AED?style=flat-square">
+  <img src="https://img.shields.io/badge/Skills-4-22C55E?style=flat-square">
   <img src="https://img.shields.io/badge/Powered%20by-OpenCode-FF6B35?style=flat-square">
 </p>
 
@@ -20,6 +20,10 @@
 ## 📋 Tabla de Contenidos
 
 - [Descripción General](#-descripción-general)
+- [Instalación](#-instalación)
+  - [Una línea](#una-línea-linuxmacos)
+  - [Manual](#manual)
+  - [Requisitos](#requisitos)
 - [Arquitectura](#-arquitectura)
 - [Tools Disponibles](#-tools-disponibles)
   - [debug](#-debug)
@@ -36,9 +40,6 @@
 - [Memoria Persistente (TOON)](#-memoria-persistente-toon)
 - [Migración desde Markdown](#-migración-desde-markdown)
 - [Flujo de Trabajo](#-flujo-de-trabajo)
-- [Instalación](#-instalación)
-  - [Requisitos](#requisitos)
-  - [Setup rápido](#setup-rápido)
 - [Ejemplos de Uso](#-ejemplos-de-uso)
 - [Skills](#-skills)
 - [Roadmap](#-roadmap)
@@ -59,7 +60,8 @@
 - 🛡️ Auditar seguridad con Lynis — hardening index, warnings, suggestions
 - 📦 Estado de parches y actualizaciones — paquetes pendientes, seguridad, compatibilidad
 - 🌐 Diagnóstico de reverse proxies — nginx/apache/caddy/traefik/haproxy, config, logs de error, 5xx/4xx
-- 🧠 Mantener **memoria persistente** de cada servidor e incidentes
+- 🧠 **Memoria persistente TOON** con auto-roles, relaciones entre entidades, detección de conflictos, compactación inteligente y evidencia truncada
+- ⚡ **Comportamiento autónomo del agente**: batch write, self-check automático, detección de contradicciones, refresco de facts vencidos, fallback SSH por password y resumen estructurado post-diagnóstico
 
 Todo **read-only** y **sin sudo** — seguro para entornos de producción.
 
@@ -116,8 +118,10 @@ powershell -ExecutionPolicy RemoteSigned -Command "iwr -useb https://raw.githubu
 
 ```
 sysadmin-ai-ecosystem/
-├── AGENTS.md                      ← Reglas de selección automática de tools
+├── AGENTS.md                      ← Reglas de comportamiento del agente
 ├── .env.example                   ← Template de credenciales (Digifort)
+├── install.sh                     ← Instalador Linux/macOS
+├── install.ps1                    ← Instalador Windows
 ├── ssh-keys/                      ← Claves SSH (auto-detectadas)
 │   ├── id_ed25519
 │   └── id_ed25519.pub
@@ -128,6 +132,7 @@ sysadmin-ai-ecosystem/
 │   ├── events/observations/       ← Observaciones históricas
 │   ├── events/incidents/          ← Incidentes
 │   ├── events/changes/            ← Cambios aplicados
+│   ├── events/relations/          ← Relaciones entre entidades
 │   ├── views/host-context/        ← Vista compacta para IA
 │   ├── schemas/                   ← Contratos TOON
 │   ├── hosts/                     ← [legacy] Markdown
@@ -137,8 +142,17 @@ sysadmin-ai-ecosystem/
     ├── node_modules/              ← @toon-format/toon
     ├── tools/                     ← Tools custom (TypeScript)
     │   ├── _ssh.ts                ← Helper SSH compartido
+    │   ├── _env.ts                ← Helper variables de entorno
     │   ├── _memory.ts             ← Helper memoria TOON
-    │   ├── memory.ts              ← Tool de gestión de memoria
+    │   ├── _root.ts               ← Helper findRepoRoot
+    │   ├── self-check.ts          ← Auto-verificación de instalación
+    │   ├── memory.ts              ← Tool memoria (router principal)
+    │   ├── memory-read-context.ts ← Leer contexto TOON de host
+    │   ├── memory-write.ts        ← Escribir observaciones
+    │   ├── memory-compact.ts      ← Compactar entidad
+    │   ├── memory-stale.ts        ← Listar facts vencidos
+    │   ├── memory-conflicts.ts    ← Detectar contradicciones
+    │   ├── memory-relation.ts     ← Gestionar relaciones entre entidades
     │   ├── debug.ts
     │   ├── recon.ts
     │   ├── docker-debug.ts
@@ -336,13 +350,17 @@ Diagnóstico de reverse proxies. Detecta automáticamente nginx, apache, caddy, 
 
 ### 🧠 memory
 
-Gestión de memoria persistente en formato TOON. Lee/escribe observaciones, consolida entidades y genera vistas compactas para la IA.
+Gestión de memoria persistente en formato TOON. Lee/escribe observaciones, consolida entidades, relaciona entidades y genera vistas compactas para la IA.
 
 | Parámetro | Tipo | Descripción |
 |-----------|------|-------------|
-| `action` | `string` | `init`, `read-host-context`, `write-observation`, `compact-host`, `render-host-context`, `stale`, `conflicts` |
+| `action` | `string` | `init`, `read-host-context`, `write-observation`, `compact-host`, `render-host-context`, `stale`, `conflicts`, `add-relation`, `list-relations` |
 | `host` | `string?` | Hostname o IP (requerido para la mayoría de acciones) |
 | `observations` | `string?` | JSON array de observaciones (requerido para `write-observation`) |
+| `entityFrom` | `string?` | Entidad origen (ej: `host:192.168.1.50`) — requerido para `add-relation` |
+| `type` | `string?` | Tipo de relación (ej: `runs`, `depends_on`, `manages`) — requerido para `add-relation` |
+| `entityTo` | `string?` | Entidad destino (ej: `service:nginx`) — requerido para `add-relation` |
+| `direction` | `string?` | Dirección para `list-relations`: `outgoing` (default), `incoming`, `both` |
 
 **Acciones:**
 - **init** — crea carpetas `entities/`, `events/`, `views/`, `schemas/`
@@ -352,6 +370,8 @@ Gestión de memoria persistente en formato TOON. Lee/escribe observaciones, cons
 - **render-host-context** — regenera la vista de contexto
 - **stale** — lista facts vencidos de un host
 - **conflicts** — lista contradicciones detectadas (servicio activo pero puerto cerrado, etc.)
+- **add-relation** — crea una relación dirigida entre dos entidades (ej: host → service)
+- **list-relations** — lista relaciones de una entidad (entrantes, salientes o ambas)
 
 ---
 
@@ -369,15 +389,17 @@ memoria/
 ├── events/observations/<week>.toon  ← observaciones históricas (append)
 ├── events/incidents/<id>.toon       ← incidentes
 ├── events/changes/<id>.toon         ← cambios aplicados
+├── events/relations/<id>.toon       ← relaciones entre entidades
 ├── views/host-context/<host>.toon   ← vista compacta para IA (leer esto)
 └── schemas/*.toon                   ← contratos TOON
 ```
 
 **Principios:**
 - **events/** = historial append-only — nunca se borra
-- **entities/** = estado consolidado actual — se actualiza por merge
-- **views/** = contexto generado para consumo rápido de la IA
+- **entities/** = estado consolidado actual — se actualiza por merge (con tiebreaker por confianza/frescura)
+- **views/** = contexto generado para consumo rápido de la IA (incluye relaciones visibles)
 - **schemas/** = contratos TOON con descripción de tablas y campos
+- **relations/** = grafos dirigidos entre entidades (host → service, service → cluster, etc.)
 
 ### Flujo de datos
 
@@ -443,6 +465,18 @@ recommended_next_tools[2]: disk-debug,service-debug
 
 Los archivos `memoria/hosts/*.md` e `memoria/incidentes/*.md` **NO se borran**. Se mantienen como fallback para hosts sin contexto TOON. La IA lee views/ primero; si no existe, cae a Markdown.
 
+### Mejoras de Memoria (Fases 1-3)
+
+| Fase | Mejora | Descripción |
+|------|--------|-------------|
+| 1A | **Merge tiebreaker** | Al consolidar, `newOrBetter()` elige entre dato entrante y existente según: fecha más reciente **o** confianza más alta. Evita que datos viejos sobreescriban información fresca |
+| 1B | **Auto-roles** | `SERVICE_ROLE_MAP` deriva automáticamente el rol del host según los servicios detectados (nginx → `reverse-proxy`, docker → `container-host`, postgresql → `database`, etc.) |
+| 1C | **Redundancia** | `hasRedundantObservations()` detecta observaciones duplicadas antes de escribir. AGENTS.md instruye al agente a compactar observaciones similares en una sola |
+| 2A | **Relaciones** | `memory-relation.ts` permite crear y listar relaciones dirigidas entre entidades (ej: host → service, service → cluster) |
+| 2B | **Contexto con relaciones** | `renderHostContext()` ahora incluye las relaciones visibles en la vista de contexto, dando visibilidad al agente de cómo se conectan las entidades |
+| 3A | **Evidencia truncada** | `appendObservations()` trunca la evidencia a 5KB (aplica `redactSecrets()` + slice) antes de persistir, ahorrando tokens |
+| 3C | **Semana ISO corregida** | `obsWeekKey()` usa el algoritmo ISO 8601 basado en jueves, asegurando que observaciones de una misma semana se agrupen correctamente |
+
 ---
 
 ## 🔄 Flujo de Trabajo
@@ -484,6 +518,9 @@ graph TD
 | *"guardá el estado actual del server 10.0.0.5"* | `memory action=write-observation host=10.0.0.5 observations=<JSON>` |
 | *"qué sabe la memoria sobre db1"* | `memory action=read-host-context host=db1` |
 | *"inicializá la memoria"* | `memory action=init` |
+| *"vinculá el host db1 con el servicio postgresql"* | `memory action=add-relation entityFrom=host:db1 type=runs entityTo=service:postgresql` |
+| *"mostrame las relaciones del host web1"* | `memory action=list-relations host=web1 direction=both` |
+| *"verificá que la instalación esté correcta"* | `self-check(host: "localhost")` → checkea SSH, herramientas, dependencias |
 
 ---
 
@@ -533,6 +570,14 @@ opencode
 - [x] **`patch-status`** — estado de parches y actualizaciones
 - [x] **`proxy-debug`** — diagnóstico de reverse proxies
 - [x] **`memory`** — memoria persistente TOON con lectura/escritura/consolidación
+- [x] **Merge tiebreaker** — consolidación inteligente por confianza/frescura
+- [x] **Auto-roles** — derivación automática del rol del host según servicios
+- [x] **Detección de redundancia** — compactación de observaciones duplicadas
+- [x] **Relaciones entre entidades** — grafos dirigidos host → service → cluster
+- [x] **Evidencia truncada** — límite de 5KB con redacción de secretos
+- [x] **Semana ISO corregida** — agrupación correcta por semana ISO 8601
+- [x] **Instaladores** — install.sh (Linux/macOS) + install.ps1 (Windows)
+- [x] **AGENTS.md mejorado** — batch write, self-check, conflictos, stale, SSH fallback, resumen estructurado
 - [ ] **`db-query`** — consultas SQL read-only a PostgreSQL/MySQL
 - [ ] **`ansible-run`** — ejecución de playbooks Ansible para remediación
 - [ ] **`prometheus-mcp`** — integración con Prometheus para métricas
