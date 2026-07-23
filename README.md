@@ -139,10 +139,10 @@ sysadmin-ai-ecosystem/
 │   ├── schemas/                   ← Contratos TOON
 │   ├── hosts/                     ← [legacy] Markdown
 │   └── incidentes/                ← [legacy] Markdown
-└── .opencode/
+    └── .opencode/
     ├── package.json               ← Dependencias npm
     ├── node_modules/              ← @toon-format/toon
-    ├── tools/                     ← Tools custom (TypeScript)
+    ├── ts-tools/                  ← Tools custom (TypeScript)
     │   ├── _ssh.ts                ← Helper SSH compartido
     │   ├── _env.ts                ← Helper variables de entorno
     │   ├── _memory.ts             ← Helper memoria TOON
@@ -414,7 +414,7 @@ memoria/
 ├── events/observations/<week>.toon  ← observaciones históricas (append)
 ├── events/incidents/<id>.toon       ← incidentes
 ├── events/changes/<id>.toon         ← cambios aplicados
-├── events/audit/<id>.toon           ← auditorías de seguridad
+├── events/audit/ssh.log             ← log de comandos SSH ejecutados
 ├── views/host-context/<host>.toon   ← vista compacta para IA (leer esto)
 └── schemas/*.toon                   ← contratos TOON
 ```
