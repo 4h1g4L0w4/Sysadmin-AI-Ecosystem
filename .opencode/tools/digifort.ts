@@ -80,7 +80,7 @@ export default tool({
       ),
   },
   async execute(args, context) {
-    const host = sanitizeParam(host, "host");
+    const host = sanitizeParam(args.host, "host");
     if (host.startsWith("ERROR:")) return host;
     const env = loadEnv(context.directory || context.worktree);
     const user = args.username || env["DIGIFORT_USER"] || "";
