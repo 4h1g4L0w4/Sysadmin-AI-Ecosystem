@@ -37,6 +37,7 @@
   - [patch-status](#-patch-status)
   - [proxy-debug](#-proxy-debug)
   - [memory](#-memory)
+  - [memory-relation](#-memory-relation)
   - [opencode-sync](#-opencode-sync)
 - [Memoria Persistente (TOON)](#-memoria-persistente-toon)
 - [Migración desde Markdown](#-migración-desde-markdown)
@@ -352,17 +353,13 @@ Diagnóstico de reverse proxies. Detecta automáticamente nginx, apache, caddy, 
 
 ### 🧠 memory
 
-Gestión de memoria persistente en formato TOON. Lee/escribe observaciones, consolida entidades, relaciona entidades y genera vistas compactas para la IA.
+Gestión de memoria persistente en formato TOON. Lee/escribe observaciones, consolida entidades y genera vistas compactas para la IA.
 
 | Parámetro | Tipo | Descripción |
 |-----------|------|-------------|
-| `action` | `string` | `init`, `read-host-context`, `write-observation`, `compact-host`, `render-host-context`, `stale`, `conflicts`, `add-relation`, `list-relations` |
+| `action` | `string` | `init`, `read-host-context`, `write-observation`, `compact-host`, `render-host-context`, `stale`, `conflicts` |
 | `host` | `string?` | Hostname o IP (requerido para la mayoría de acciones) |
 | `observations` | `string?` | JSON array de observaciones (requerido para `write-observation`) |
-| `entityFrom` | `string?` | Entidad origen (ej: `host:192.168.1.50`) — requerido para `add-relation` |
-| `type` | `string?` | Tipo de relación (ej: `runs`, `depends_on`, `manages`) — requerido para `add-relation` |
-| `entityTo` | `string?` | Entidad destino (ej: `service:nginx`) — requerido para `add-relation` |
-| `direction` | `string?` | Dirección para `list-relations`: `outgoing` (default), `incoming`, `both` |
 
 **Acciones:**
 - **init** — crea carpetas `entities/`, `events/`, `views/`, `schemas/`
@@ -372,8 +369,22 @@ Gestión de memoria persistente en formato TOON. Lee/escribe observaciones, cons
 - **render-host-context** — regenera la vista de contexto
 - **stale** — lista facts vencidos de un host
 - **conflicts** — lista contradicciones detectadas (servicio activo pero puerto cerrado, etc.)
-- **add-relation** — crea una relación dirigida entre dos entidades (ej: host → service)
-- **list-relations** — lista relaciones de una entidad (entrantes, salientes o ambas)
+
+### 🔗 memory-relation
+
+Gestiona relaciones dirigidas entre entidades (host → host). Las relaciones se persisten en el perfil TOON de cada host y se muestran automáticamente en la vista de contexto.
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `action` | `string` | `add` (crear relación) o `list` (listar relaciones de un host) |
+| `from` | `string?` | Host origen (ej: `192.168.1.50`) — requerido para `add` |
+| `relation` | `string?` | Tipo: `proxiesa`, `depende-de`, `conecta-a`, `balancea-a`, `es-clon-de` |
+| `to` | `string?` | Host destino — requerido para `add` |
+| `host` | `string?` | Host a consultar — requerido para `list` |
+
+**Acciones:**
+- **add** — crea relación dirigida: `from —relación→ to`
+- **list** — lista todas las relaciones de un host (entrantes y salientes)
 
 ### 🔄 opencode-sync
 
@@ -403,17 +414,16 @@ memoria/
 ├── events/observations/<week>.toon  ← observaciones históricas (append)
 ├── events/incidents/<id>.toon       ← incidentes
 ├── events/changes/<id>.toon         ← cambios aplicados
-├── events/relations/<id>.toon       ← relaciones entre entidades
+├── events/audit/<id>.toon           ← auditorías de seguridad
 ├── views/host-context/<host>.toon   ← vista compacta para IA (leer esto)
 └── schemas/*.toon                   ← contratos TOON
 ```
 
 **Principios:**
 - **events/** = historial append-only — nunca se borra
-- **entities/** = estado consolidado actual — se actualiza por merge (con tiebreaker por confianza/frescura)
+- **entities/** = estado consolidado actual — se actualiza por merge (con tiebreaker por confianza/frescura), incluye relaciones entre entidades
 - **views/** = contexto generado para consumo rápido de la IA (incluye relaciones visibles)
 - **schemas/** = contratos TOON con descripción de tablas y campos
-- **relations/** = grafos dirigidos entre entidades (host → service, service → cluster, etc.)
 
 ### Flujo de datos
 
@@ -532,8 +542,8 @@ graph TD
 | *"guardá el estado actual del server 10.0.0.5"* | `memory action=write-observation host=10.0.0.5 observations=<JSON>` |
 | *"qué sabe la memoria sobre db1"* | `memory action=read-host-context host=db1` |
 | *"inicializá la memoria"* | `memory action=init` |
-| *"vinculá el host db1 con el servicio postgresql"* | `memory action=add-relation entityFrom=host:db1 type=runs entityTo=service:postgresql` |
-| *"mostrame las relaciones del host web1"* | `memory action=list-relations host=web1 direction=both` |
+| *"vinculá el host db1 con el servicio postgresql"* | `memory-relation action=add from=db1 relation=depende-de to=postgresql` |
+| *"mostrame las relaciones del host web1"* | `memory-relation action=list host=web1` |
 | *"verificá que la instalación esté correcta"* | `self-check(host: "localhost")` → checkea SSH, herramientas, dependencias |
 | *"sincronizá las tools después del pull"* | `opencode-sync apply=true` → actualiza `opencode.json` con tools nuevas/quitadas |
 | *"mostrame qué tools se agregaron o sacaron"* | `opencode-sync` (sin `apply`) → muestra diff sin modificar |

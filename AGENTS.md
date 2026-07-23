@@ -36,15 +36,15 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 
 2. **Auto-diagnóstico inicial** → corré `self-check`. Si hay fallos, reportalos y preguntá si querés continuar.
 
-3. **Host nuevo / desconocido** → corré `recon` primero para mapear el servidor.
+3. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
 
-4. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
+4. **Host nuevo / desconocido** → corré `recon` primero para mapear el servidor.
+
+5. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
    - Si no hay contexto TOON, caé a `./memoria/hosts/<host>.md` (legacy).
    - **Si `memory-stale host=<host>` detecta facts vencidos**, ejecutá automáticamente las tools necesarias (debug, recon, etc.) para refrescar los facts vencidos antes de continuar con el diagnóstico. No esperés a que el usuario lo pida.
 
-5. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.).
-
-6. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
+6. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.).
 
 7. **Acumulá observaciones, NO escribas después de cada tool.** Mantené un array en memoria con las observaciones más relevantes de todas las tools ejecutadas. Al final de todo el diagnóstico, hacé **un único** `memory-write host=<host> observations=<JSON>`.
    - Cada observación debe incluir: `id`, `entity`, `key`, `value`, `source`, `observed_at`, `confidence`, `ttl_days`.
@@ -54,7 +54,19 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 
 9. **Compactación inteligente.** Si las observaciones escritas son redundantes (repiten facts ya existentes en el perfil con los mismos valores), ejecutá automáticamente `memory-compact host=<host>` para limpiar el perfil y dejar solo datos nuevos.
 
-10. **Si resolviste un problema** → registralo como incidente TOON con `memory-write`.
+10. **Si resolviste un problema** → registralo como incidente TOON directamente en `memoria/events/incidents/<id>.toon` con schema `sysadmin.incident.v1`:
+    ```
+    schema: sysadmin.incident.v1
+    id: inc-<host>-<fecha>       ← único
+    host: <IP o hostname>       ← servidor afectado
+    severity: <critical|warning|info>
+    summary: <descripción corta>
+    status: <resolved|mitigated>
+    opened_at: <ISO 8601>
+    resolved_at: <ISO 8601>
+    evidence: |-               ← opcional
+      <detalles del diagnóstico>
+    ```
 
 11. **Al finalizar, presentá un resumen estructurado:**
    ```
@@ -95,12 +107,13 @@ La memoria canónica usa formato **TOON** (Token-Oriented Object Notation), no M
 
 ```
 memoria/
-├── entities/hosts/<host>.toon      ← estado consolidado del host
+├── entities/hosts/<host>.toon      ← estado consolidado del host (incluye relaciones)
 ├── entities/services/<svc>.toon     ← estado consolidado de servicios
 ├── entities/clusters/<cls>.toon     ← estado consolidado de clusters
 ├── events/observations/<week>.toon  ← observaciones históricas (append)
 ├── events/incidents/<id>.toon       ← incidentes
 ├── events/changes/<id>.toon         ← cambios aplicados
+├── events/audit/<id>.toon           ← auditorías de seguridad
 ├── views/host-context/<host>.toon   ← vista compacta para la IA (leer esto)
 └── schemas/*.toon                   ← contratos TOON
 ```
