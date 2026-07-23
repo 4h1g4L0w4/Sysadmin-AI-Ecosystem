@@ -65,7 +65,7 @@
 - 🧠 **Memoria persistente TOON** con auto-roles, relaciones entre entidades, detección de conflictos, compactación inteligente y evidencia truncada
 - ⚡ **Comportamiento autónomo del agente**: auto-sync de tools al iniciar chat, batch write, self-check automático, detección de contradicciones, refresco de facts vencidos, fallback SSH por password y resumen estructurado post-diagnóstico
 
-Todo **read-only** y **sin sudo** — seguro para entornos de producción.
+Todo **read-only** y **sin sudo** — seguro para entornos de producción. Ninguna tool modifica estado del servidor sin confirmación explícita del usuario. Las acciones correctivas se registran como cambios TOON (`memoria/events/changes/`).
 
 ---
 

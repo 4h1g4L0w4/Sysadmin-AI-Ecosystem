@@ -12,6 +12,17 @@ Si durante una interacción ocurre un error inesperado (ej: "tool not found", el
 
 Si `self-check` reporta fallos, presentarlos al usuario antes de continuar con cualquier diagnóstico.
 
+## Modo read-only (seguridad)
+
+Todas las tools de diagnóstico son **estrictamente de solo lectura**. Ninguna tool ejecuta comandos que modifiquen el estado del servidor remoto (no reinician servicios, no tocan configuraciones, no matan procesos, no aplican parches).
+
+Si durante un diagnóstico identificás una acción correctiva necesaria:
+1. **Informala** al usuario en el resumen como "Acción recomendada"
+2. **No la ejecutés** sin confirmación explícita del usuario en ese mismo turno
+3. Si el usuario **autoriza** la acción, ejecutala y registrala como change TOON (paso 10 del flujo)
+
+Esta regla aplica a todas las tools (debug, recon, network-debug, ssl-check, docker-debug, k8s-debug, security-audit, patch-status, proxy-debug, digifort). Ninguna de ellas modifica nada en el servidor remoto.
+
 ## Selección automática de tools
 
 El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta automáticamente según su mensaje:
@@ -32,30 +43,47 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 
 ## Flujo de trabajo
 
+### Al iniciar un chat (una sola vez por sesión)
+
 1. **Auto-sync inicial** → corré `opencode-sync apply=true` para sincronizar tools y skills con el repo. Si falla, reportalo y continuá igual.
 
 2. **Auto-diagnóstico inicial** → corré `self-check`. Si hay fallos, reportalos y preguntá si querés continuar.
 
+### Por cada pedido del usuario
+
 3. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
 
 4. **Host nuevo / desconocido** → corré `recon` primero para mapear el servidor.
+   - **Preguntale al usuario** si este host tiene relación con otros. Si confirma, ejecutá `memory-relation action=add from=<host> relation=<tipo> to=<otro-host>`.
 
 5. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
    - Si no hay contexto TOON, caé a `./memoria/hosts/<host>.md` (legacy).
-   - **Si `memory-stale host=<host>` detecta facts vencidos**, ejecutá automáticamente las tools necesarias (debug, recon, etc.) para refrescar los facts vencidos antes de continuar con el diagnóstico. No esperés a que el usuario lo pida.
-   - **Preguntale al usuario** si este host tiene relación con otros (dependencias, proxies, conexiones). Si confirma, ejecutá `memory-relation action=add from=<host> relation=<tipo> to=<otro-host>`.
+   - **Si `memory-stale host=<host>` detecta facts vencidos**, ejecutá automáticamente las tools necesarias (debug, recon, etc.) para refrescar los facts vencidos antes de continuar. No esperés a que el usuario lo pida.
+   - **Preguntale al usuario** si este host tiene relación con otros. Si confirma, ejecutá `memory-relation action=add from=<host> relation=<tipo> to=<otro-host>`.
 
-6. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.).
+6. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.). Si dos categorías describen una misma cadena causal (ej: "proxy tira 502 y el container backend no responde"), componé ambas tools aunque el usuario no pida "completo".
 
-7. **Acumulá observaciones, NO escribas después de cada tool.** Mantené un array en memoria con las observaciones más relevantes de todas las tools ejecutadas. Al final de todo el diagnóstico, hacé **un único** `memory-write host=<host> observations=<JSON>`.
-   - Cada observación debe incluir: `id`, `entity`, `key`, `value`, `source`, `observed_at`, `confidence`, `ttl_days`.
-   - **NUNCA guardar secretos, passwords, tokens ni IPs reales.**
+7. **Acumulá observaciones, NO escribas después de cada tool.** Mantené un array en memoria con las observaciones más relevantes de todas las tools ejecutadas. Al final del diagnóstico de **ese host**, hacé **un único** `memory-write host=<host> observations=<JSON>`.
+   - Cada observación incluye: `id`, `entity`, `key`, `value`, `source`, `observed_at`, `confidence`, `ttl_days`.
+   - **NUNCA guardar passwords, tokens ni secretos.** Hostnames preferidos para entidades; si no hay hostname conocido, IPs son aceptables.
 
 8. **Después del write, ejecutá automáticamente `memory-conflicts host=<host>`.** Si hay contradicciones (ej: servicio activo pero puerto cerrado), incluilas en el resumen al usuario.
 
-9. **Compactación inteligente.** Si las observaciones escritas son redundantes (repiten facts ya existentes en el perfil con los mismos valores), ejecutá automáticamente `memory-compact host=<host>` para limpiar el perfil y dejar solo datos nuevos.
+9. **Compactación inteligente.** Si las observaciones escritas son redundantes (repiten facts ya existentes en el perfil con los mismos valores), ejecutá automáticamente `memory-compact host=<host>` para limpiar el perfil y dejar solo datos nuevos. Si no estás seguro de si un fact es redundante, comparalo contra el perfil actual en `entities/hosts/<host>.toon`.
 
-10. **Si resolviste un problema** → registralo como incidente TOON directamente en `memoria/events/incidents/<id>.toon` con schema `sysadmin.incident.v1`:
+10. **Si aplicaste un cambio en el servidor** (reinicio de servicio, config change, fix) → registralo como change TOON en `memoria/events/changes/<id>.toon` con schema `sysadmin.change.v1`:
+    ```
+    schema: sysadmin.change.v1
+    id: chg-<host>-<fecha>       ← único
+    host: <IP o hostname>       ← servidor afectado
+    summary: <qué cambió>
+    action: <applied|rolledback|in-progress>
+    applied_at: <ISO 8601>
+    evidence: |-               ← opcional
+      <output del comando>
+    ```
+
+11. **Si resolviste un problema** → registralo como incidente TOON en `memoria/events/incidents/<id>.toon` con schema `sysadmin.incident.v1`:
     ```
     schema: sysadmin.incident.v1
     id: inc-<host>-<fecha>       ← único
@@ -69,7 +97,7 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
       <detalles del diagnóstico>
     ```
 
-11. **Al finalizar, presentá un resumen estructurado:**
+12. **Al finalizar el diagnóstico de este host, presentá un resumen estructurado:**
     ```
     ── Resumen: <host> ──
     Estado: <ok / warning / critical>
@@ -155,8 +183,7 @@ Podés ejecutar **múltiples tools** en una misma interacción si el pedido lo a
 | "diagnóstico completo de red y proxy" | `network-debug` + `proxy-debug` |
 | "todo lo que sepas de X" | `memory-read-context` + todas las tools relevantes según el contexto |
 
-Al componer:
-- Siempre empezar con `opencode-sync apply=true` + `self-check` si es el inicio del chat.
+Al componer (asumiendo que los pasos 1-2 ya se ejecutaron al iniciar el chat):
 - Si el host es **conocido**, leé contexto primero con `memory-read-context` y verificá facts vencidos con `memory-stale`.
 - Si el host es **desconocido**, empezá con `recon`.
 - Acumulá observaciones en memoria y escribí **una sola vez** al final.
@@ -174,7 +201,7 @@ Si el mensaje del usuario **no matchea** ninguna categoría de la tabla:
 
 - Las credentials de Digifort se leen del archivo `.env` en la raíz del proyecto, con las variables `DIGIFORT_USER` y `DIGIFORT_PASS`.
 - Usá el `.env.example` como plantilla.
-- El usuario puede sobreescribirlas pasando `username`/`password` directamente a la tool `digifort`.
+- El usuario puede sobreescribirlas pasando `username`/`password` directamente a la tool `digifort`. **Advertencia:** el override en el chat queda visible en el historial de la conversación. Preferí siempre el `.env`.
 
 ## Recursos del proyecto
 
