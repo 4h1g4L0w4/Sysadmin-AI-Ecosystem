@@ -1,0 +1,1 @@
+{"name":"opencode-tools","private":true,"type":"module","scripts":{"test":"vitest run","test:watch":"vitest"},"dependencies":{"@opencode-ai/plugin":"1.18.4","@toon-format/toon":"^2.3.0"},"devDependencies":{"vitest":"^4.1.10"}}
