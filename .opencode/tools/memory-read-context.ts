@@ -22,7 +22,7 @@ export default tool({
     const root = projectRoot();
     const toonViewPath = path.join(root, "memoria", "views", "host-context", `${safeHost}.toon`);
     if (!existsSync(toonViewPath)) {
-      const markdownPath = path.join(root, "memoria", "hosts", `${args.host}.md`);
+      const markdownPath = path.join(root, "memoria", "hosts", `${safeHost}.md`);
       if (existsSync(markdownPath)) {
         try {
           const md = await readFile(markdownPath, "utf-8");

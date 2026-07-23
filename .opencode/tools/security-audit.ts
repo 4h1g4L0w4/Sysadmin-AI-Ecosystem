@@ -54,7 +54,7 @@ export default tool({
       `  command -v curl >/dev/null 2>&1 && DOWNLOADER="curl -sL -o /tmp/lynis.tar.gz"`,
       `  [ -z "$DOWNLOADER" ] && command -v wget >/dev/null 2>&1 && DOWNLOADER="wget -q -O /tmp/lynis.tar.gz"`,
       `  if [ -z "$DOWNLOADER" ]; then echo "NEED_CURL_OR_WGET"; exit 1; fi`,
-      `  $DOWNLOADER https://api.github.com/repos/CISOfy/lynis/tarball || { echo "DOWNLOAD_FAILED"; exit 1; }`,
+      `  $DOWNLOADER https://api.github.com/repos/CISOfy/lynis/tarball/3.1.7 || { echo "DOWNLOAD_FAILED"; exit 1; }`,
       `  tar xzf /tmp/lynis.tar.gz -C /tmp 2>/dev/null || { echo "EXTRACT_FAILED"; exit 1; }`,
       `  rm -f /tmp/lynis.tar.gz`,
       `  DIR=$(ls -d /tmp/CISOfy-lynis-* 2>/dev/null | head -1)`,

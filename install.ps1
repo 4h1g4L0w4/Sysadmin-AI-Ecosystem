@@ -185,7 +185,8 @@ if (Test-Path ".env") {
   Copy-Item ".env.example" ".env"
   Write-Warn "Editá .env con tus credenciales Digifort (o dejalas vacías si no usás Digifort)"
   $du = Read-Host "  DIGIFORT_USER (Enter para dejar vacío)"
-  $dp = Read-Host "  DIGIFORT_PASS (Enter para dejar vacío)"
+  $dpSec = Read-Host "  DIGIFORT_PASS (Enter para dejar vacío)" -AsSecureString
+  $dp = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($dpSec))
 
   if (-not [string]::IsNullOrWhiteSpace($du) -or -not [string]::IsNullOrWhiteSpace($dp)) {
     (Get-Content ".env") -replace 'DIGIFORT_USER=.*', "DIGIFORT_USER=$du" -replace 'DIGIFORT_PASS=.*', "DIGIFORT_PASS=$dp" | Set-Content ".env"

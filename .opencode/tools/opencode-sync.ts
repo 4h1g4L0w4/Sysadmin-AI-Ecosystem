@@ -3,6 +3,7 @@ import { execFileSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from "fs";
 import path from "path";
 import { projectRoot } from "./_root";
+import { sanitizeParam } from "./_ssh";
 
 const SELF = "opencode-sync.ts";
 const TOOLS_PREFIX = "./.opencode/tools/";
@@ -28,6 +29,8 @@ export default tool({
     },
   },
   async execute({ pull = true, apply = false, branch = "main" }) {
+    branch = sanitizeParam(branch, "branch");
+    if (branch.startsWith("ERROR:")) return branch;
     const ROOT = projectRoot();
     const lines: string[] = [];
     lines.push("=== Sync Tools & Skills ===");

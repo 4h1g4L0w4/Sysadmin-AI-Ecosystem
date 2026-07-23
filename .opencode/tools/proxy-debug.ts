@@ -169,13 +169,28 @@ function buildProxyScript(proxy: string, paths: ProxyPaths): string[] {
   ].filter(Boolean);
 }
 
+const SAFE_PATH = /^[a-zA-Z0-9_@.\/\-:]+$/;
+const SAFE_UNIT = /^[a-zA-Z0-9_@.\-:]+$/;
+
+function validatePaths(paths: ProxyPaths): string | true {
+  for (const key of ["configDirs", "configFiles", "errorLogs", "accessLogs"] as const) {
+    for (const v of paths[key]) {
+      if (!SAFE_PATH.test(v)) return `invalid ${key} entry '${v}'`;
+    }
+  }
+  if (paths.unitName && !SAFE_UNIT.test(paths.unitName)) {
+    return `invalid unitName '${paths.unitName}'`;
+  }
+  return true;
+}
+
 function buildScript(forceProxy?: string, overrides?: Record<string, Partial<ProxyPaths>>): string {
   const lines: string[] = [];
   lines.push(`echo "==DETECTION=="`);
 
   if (forceProxy) {
     lines.push(`echo "FORCED=${forceProxy}"`);
-    lines.push(`command -v ${forceProxy} >/dev/null 2>&1 || echo "NOT_INSTALLED=${forceProxy}"`);
+    lines.push(`command -v "${forceProxy}" >/dev/null 2>&1 || echo "NOT_INSTALLED=${forceProxy}"`);
   } else {
     lines.push(
       `for p in nginx apache2 httpd caddy traefik haproxy; do command -v "$p" >/dev/null 2>&1 && echo "FOUND=$p"; done`,
@@ -201,8 +216,13 @@ function buildScript(forceProxy?: string, overrides?: Record<string, Partial<Pro
       accessLogs: ov.accessLogs || base.accessLogs,
       unitName: ov.unitName || base.unitName,
     };
+    const valid = validatePaths(paths);
+    if (valid !== true) {
+      lines.push(`echo "SKIP ${lookup}: ${valid}"`);
+      continue;
+    }
     const cmds = buildProxyScript(lookup, paths);
-    lines.push(`\nif command -v ${p} >/dev/null 2>&1; then`);
+    lines.push(`\nif command -v "${p}" >/dev/null 2>&1; then`);
     for (const c of cmds) {
       for (const line of c.split("\n")) {
         lines.push(line);

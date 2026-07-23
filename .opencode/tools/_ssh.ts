@@ -3,6 +3,8 @@ import path from "path";
 import fs from "fs";
 import { projectRoot } from "./_root";
 
+const KNOWN_HOSTS_FILE = ".ssh_known_hosts";
+
 export interface SshOptions {
   host: string;
   port?: number;
@@ -29,10 +31,13 @@ export function resolveSshKey(baseDir?: string): string | undefined {
 }
 
 function sshCliArgs(options: SshOptions): string[] {
+  const root = projectRoot();
+  const knownHostsPath = path.join(root, KNOWN_HOSTS_FILE);
+  try { fs.mkdirSync(path.dirname(knownHostsPath), { recursive: true }); } catch {}
   const args: string[] = [
     "-o", "LogLevel=ERROR",
     "-o", "StrictHostKeyChecking=accept-new",
-    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", `UserKnownHostsFile=${knownHostsPath}`,
     "-o", "ConnectTimeout=15",
     "-o", "BatchMode=yes",
   ];

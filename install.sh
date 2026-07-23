@@ -123,14 +123,18 @@ else
   cp .env.example .env
   warn "Editá .env con tus credenciales Digifort (o dejalas vacías si no usás Digifort)"
   read -rp "  DIGIFORT_USER (Enter para dejar vacío): " du
-  read -rp "  DIGIFORT_PASS (Enter para dejar vacío): " dp
+  read -rsp "  DIGIFORT_PASS (Enter para dejar vacío): " dp
+  echo
   if [ -n "$du" ] || [ -n "$dp" ]; then
+    # escape & and \ for sed replacement
+    du_esc=$(printf '%s\n' "$du" | sed 's/[&\]/\\&/g')
+    dp_esc=$(printf '%s\n' "$dp" | sed 's/[&\]/\\&/g')
     if [ "$(uname)" = "Darwin" ]; then
-      sed -i '' "s/DIGIFORT_USER=.*/DIGIFORT_USER=${du}/" .env 2>/dev/null || true
-      sed -i '' "s/DIGIFORT_PASS=.*/DIGIFORT_PASS=${dp}/" .env 2>/dev/null || true
+      sed -i '' "s#DIGIFORT_USER=.*#DIGIFORT_USER=${du_esc}#" .env 2>/dev/null || true
+      sed -i '' "s#DIGIFORT_PASS=.*#DIGIFORT_PASS=${dp_esc}#" .env 2>/dev/null || true
     else
-      sed -i "s/DIGIFORT_USER=.*/DIGIFORT_USER=${du}/" .env 2>/dev/null || true
-      sed -i "s/DIGIFORT_PASS=.*/DIGIFORT_PASS=${dp}/" .env 2>/dev/null || true
+      sed -i "s#DIGIFORT_USER=.*#DIGIFORT_USER=${du_esc}#" .env 2>/dev/null || true
+      sed -i "s#DIGIFORT_PASS=.*#DIGIFORT_PASS=${dp_esc}#" .env 2>/dev/null || true
     fi
     ok "Credenciales guardadas en .env"
   else

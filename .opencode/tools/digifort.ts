@@ -2,6 +2,7 @@ import { tool } from "@opencode-ai/plugin";
 import path from "path";
 import fs from "fs";
 import { loadEnv } from "./_env";
+import { sanitizeParam } from "./_ssh";
 
 function fmtTime(sec: number): string {
   if (sec < 60) return `${sec}s`;
@@ -24,6 +25,9 @@ function fmtTraffic(bps: number): string {
   return `${(bps / 1e6).toFixed(1)} Mbps`;
 }
 
+// ADVERTENCIA: Digifort solo expone HTTP, no HTTPS.
+// Las credenciales viajan en texto plano sobre la red.
+
 async function apiFetch(
   host: string,
   port: number,
@@ -31,7 +35,7 @@ async function apiFetch(
   user: string,
   pass: string,
 ): Promise<any> {
-  const url = `http://${host}:${port}${endpoint}?AuthUser=${user}&AuthPass=${pass}&ResponseFormat=JSON`;
+  const url = `http://${host}:${port}${endpoint}?AuthUser=${encodeURIComponent(user)}&AuthPass=${encodeURIComponent(pass)}&ResponseFormat=JSON`;
   const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -76,6 +80,8 @@ export default tool({
       ),
   },
   async execute(args, context) {
+    const host = sanitizeParam(host, "host");
+    if (host.startsWith("ERROR:")) return host;
     const env = loadEnv(context.directory || context.worktree);
     const user = args.username || env["DIGIFORT_USER"] || "";
     const pass = args.password || env["DIGIFORT_PASS"] || "";
@@ -89,12 +95,12 @@ export default tool({
     if (!pass) return "ERROR: no se especificó password y no hay DIGIFORT_PASS en .env";
 
     const out: string[] = [
-      `====== DIGIFORT ${args.host}:${port} ======`,
+      `====== DIGIFORT ${host}:${port} ======`,
     ];
 
     try {
       if (action === "usage" || action === "all") {
-        const json = await apiFetch(args.host, port, "/Interface/Server/GetUsage", user, pass);
+        const json = await apiFetch(host, port, "/Interface/Server/GetUsage", user, pass);
         const d = json?.Response?.Data?.Stats;
         if (d) {
           out.push(
@@ -113,7 +119,7 @@ export default tool({
       }
 
       if (action === "cameras" || action === "all") {
-        const json = await apiFetch(args.host, port, "/Interface/Cameras/GetCameras", user, pass);
+        const json = await apiFetch(host, port, "/Interface/Cameras/GetCameras", user, pass);
         const raw: any[] = json?.Response?.Data?.Cameras || json?.Response?.Data || [];
         if (!Array.isArray(raw)) {
           if (raw.length === undefined) {
@@ -148,7 +154,7 @@ export default tool({
       }
 
       if (action === "cameras-status" || action === "all") {
-        const json = await apiFetch(args.host, port, "/Interface/Cameras/GetStatus", user, pass);
+        const json = await apiFetch(host, port, "/Interface/Cameras/GetStatus", user, pass);
         const raw: any[] = json?.Response?.Data?.Cameras || json?.Response?.Data || [];
         if (!Array.isArray(raw)) {
           if (raw.length === undefined) {
@@ -183,13 +189,13 @@ export default tool({
       return out.join("\n");
     } catch (e: any) {
       if (e.name === "TimeoutError" || e.name === "AbortError") {
-        return `ERROR: timeout conectando a ${args.host}:${port} (60s)`;
+        return `ERROR: timeout conectando a ${host}:${port} (60s)`;
       }
       if (e.message?.includes("ECONNREFUSED")) {
-        return `ERROR: conexión rechazada a ${args.host}:${port}`;
+        return `ERROR: conexión rechazada a ${host}:${port}`;
       }
       if (e.message?.includes("fetch failed")) {
-        return `ERROR: no se pudo conectar a ${args.host}:${port}. Verificá que Digifort esté corriendo.`;
+        return `ERROR: no se pudo conectar a ${host}:${port}. Verificá que Digifort esté corriendo.`;
       }
       return `ERROR: ${e.message || e}`;
     }

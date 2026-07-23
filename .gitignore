@@ -60,5 +60,5 @@ Thumbs.db
 
 # ─── Entorno ───
 .env
-.env
 .env.local
+.ssh_known_hosts
