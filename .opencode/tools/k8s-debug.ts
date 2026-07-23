@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
-import { sshExec, SshOptions, resolveSshKey } from "./_ssh";
+import { sshExec, SshOptions, resolveSshKey, sanitizeParam } from "./_ssh";
 
 export default tool({
   description:
@@ -46,7 +46,10 @@ export default tool({
       proxyJump: args.proxyJump,
     };
 
-    const ns = args.namespace;
+    const ns = args.namespace ? sanitizeParam(args.namespace, "namespace") : undefined;
+    if (ns && ns.startsWith("ERROR:")) return ns;
+    const pod = args.pod ? sanitizeParam(args.pod, "pod") : undefined;
+    if (pod && pod.startsWith("ERROR:")) return pod;
     const allNs = !ns;
 
     const cmds: string[] = [
@@ -56,16 +59,16 @@ export default tool({
       `kubectl get namespaces 2>/dev/null`,
     ];
 
-    if (args.pod) {
+    if (pod) {
       cmds.push(
-        `echo "====== POD: ${ns}/${args.pod} ======"`,
-        `kubectl describe pod "${args.pod}" -n "${ns}" 2>/dev/null || echo "pod not found"`,
+        `echo "====== POD: ${ns}/${pod} ======"`,
+        `kubectl describe pod "${pod}" -n "${ns}" 2>/dev/null || echo "pod not found"`,
         `echo "--- Logs (last 80) ---"`,
-        `kubectl logs "${args.pod}" -n "${ns}" --tail=80 2>/dev/null || echo "no logs"`,
+        `kubectl logs "${pod}" -n "${ns}" --tail=80 2>/dev/null || echo "no logs"`,
         `echo "--- Previous logs (last 40) ---"`,
-        `kubectl logs "${args.pod}" -n "${ns}" --tail=40 --previous 2>/dev/null || echo "no previous logs"`,
+        `kubectl logs "${pod}" -n "${ns}" --tail=40 --previous 2>/dev/null || echo "no previous logs"`,
         `echo "--- Restart count ---"`,
-        `kubectl get pod "${args.pod}" -n "${ns}" -o jsonpath='{.status.containerStatuses[*].restartCount}' 2>/dev/null || echo "n/a"`,
+        `kubectl get pod "${pod}" -n "${ns}" -o jsonpath='{.status.containerStatuses[*].restartCount}' 2>/dev/null || echo "n/a"`,
       );
     } else {
       const nsFlag = allNs ? "--all-namespaces" : `-n "${ns}"`;

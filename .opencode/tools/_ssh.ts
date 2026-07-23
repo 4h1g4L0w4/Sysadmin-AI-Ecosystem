@@ -60,8 +60,20 @@ function auditLog(options: SshOptions, commands: string[]): void {
   }
 }
 
+const SAFE_PARAM = /^[a-zA-Z0-9_@.\-:]+$/;
+
+export function sanitizeParam(value: string, name: string, pattern?: RegExp): string {
+  const safe = pattern || SAFE_PARAM;
+  if (!safe.test(value)) {
+    return `ERROR: invalid ${name} '${value}'`;
+  }
+  return value;
+}
+
 export function sshExec(options: SshOptions, commands: string[], timeout = 60_000): string {
-  const args = [...sshCliArgs(options), options.host, commands.join(" ; ")];
+  const hostCheck = sanitizeParam(options.host, "host");
+  if (hostCheck.startsWith("ERROR:")) return hostCheck;
+  const args = [...sshCliArgs(options), "--", options.host, commands.join(" ; ")];
   auditLog(options, commands);
   try {
     const result = execFileSync("ssh", args, {

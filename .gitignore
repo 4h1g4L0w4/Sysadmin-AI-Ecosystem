@@ -60,4 +60,5 @@ Thumbs.db
 
 # ─── Entorno ───
 .env
-.env.*
+.env
+.env.local

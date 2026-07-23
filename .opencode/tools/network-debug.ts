@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
-import { sshExec, SshOptions, resolveSshKey } from "./_ssh";
+import { sshExec, SshOptions, resolveSshKey, sanitizeParam } from "./_ssh";
 
 export default tool({
   description:
@@ -45,9 +45,13 @@ export default tool({
       proxyJump: args.proxyJump,
     };
 
-    const t = args.target;
+    const t = sanitizeParam(args.target, "target");
+    if (t.startsWith("ERROR:")) return t;
     const tp = args.targetPort;
     const mode = args.test || "all";
+    if (mode !== "all" && !/^(ping|dns|traceroute|mtr|http|ports)$/.test(mode)) {
+      return `ERROR: invalid test type '${mode}'`;
+    }
 
     const cmds: string[] = [
       `echo "====== NETWORK DIAGNOSTICS FROM $(hostname) TO ${t} ======"`,

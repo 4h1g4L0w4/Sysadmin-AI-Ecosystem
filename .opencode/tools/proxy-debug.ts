@@ -309,7 +309,11 @@ export default tool({
   },
   async execute(args, context) {
     const mode = args.mode || "auto";
+    const VALID_PROXIES = ["nginx", "apache", "httpd", "caddy", "traefik", "haproxy"];
     const forceProxy = args.proxy;
+    if (forceProxy && !VALID_PROXIES.includes(forceProxy)) {
+      return `ERROR: invalid proxy '${forceProxy}'. Valid: ${VALID_PROXIES.join(", ")}`;
+    }
     const sshOpts: SshOptions = {
       host: args.host,
       port: args.port,

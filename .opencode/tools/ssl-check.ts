@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
-import { sshExec, SshOptions, resolveSshKey } from "./_ssh";
+import { sshExec, SshOptions, resolveSshKey, sanitizeParam } from "./_ssh";
 
 export default tool({
   description:
@@ -45,9 +45,11 @@ export default tool({
       proxyJump: args.proxyJump,
     };
 
-    const target = args.target;
+    const target = sanitizeParam(args.target, "target");
+    if (target.startsWith("ERROR:")) return target;
     const port = args.targetPort || 443;
-    const sni = args.sni || target;
+    const sni = args.sni ? sanitizeParam(args.sni, "sni") : target;
+    if (sni.startsWith("ERROR:")) return sni;
 
     const cmds: string[] = [
       `echo "====== SSL/TLS CHECK ${target}:${port} ======"`,

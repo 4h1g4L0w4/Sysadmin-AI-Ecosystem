@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from "fs";
 import path from "path";
 import { projectRoot } from "./_root";
@@ -37,12 +37,12 @@ export default tool({
     if (pull) {
       lines.push("--- Git pull ---");
       try {
-        execSync("git --version", { cwd: ROOT, stdio: "pipe" });
-        const status = execSync("git status --porcelain", { cwd: ROOT, stdio: "pipe" }).toString().trim();
+        execFileSync("git", ["--version"], { cwd: ROOT, stdio: "pipe" });
+        const status = execFileSync("git", ["status", "--porcelain"], { cwd: ROOT, stdio: "pipe" }).toString().trim();
         if (status.length > 0) {
           lines.push("  \u26a0 Working tree has uncommitted changes — skipping pull");
         } else {
-          const result = execSync(`git pull origin ${branch} --ff-only`, {
+          const result = execFileSync("git", ["pull", "origin", branch, "--ff-only"], {
             cwd: ROOT,
             stdio: "pipe",
             timeout: 30000,

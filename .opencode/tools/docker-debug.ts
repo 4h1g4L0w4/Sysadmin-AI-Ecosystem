@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
-import { sshExec, SshOptions, resolveSshKey } from "./_ssh";
+import { sshExec, SshOptions, resolveSshKey, sanitizeParam } from "./_ssh";
 
 export default tool({
   description:
@@ -38,6 +38,9 @@ export default tool({
       proxyJump: args.proxyJump,
     };
 
+    const container = args.container ? sanitizeParam(args.container, "container") : undefined;
+    if (container && container.startsWith("ERROR:")) return container;
+
     const cmds: string[] = [
       `echo "====== ALL CONTAINERS ======"`,
       `docker ps -a 2>/dev/null || echo "[docker not available or permission denied]"`,
@@ -51,20 +54,20 @@ export default tool({
       `docker volume ls 2>/dev/null`,
     ];
 
-    if (args.container) {
+    if (container) {
       cmds.push(
-        `echo "====== DETAILS: ${args.container} ======"`,
-        `docker inspect "${args.container}" 2>/dev/null || echo "container not found"`,
+        `echo "====== DETAILS: ${container} ======"`,
+        `docker inspect "${container}" 2>/dev/null || echo "container not found"`,
         `echo "--- Health ---"`,
-        `docker inspect --format='{{json .State.Health}}' "${args.container}" 2>/dev/null || echo "no health check"`,
+        `docker inspect --format='{{json .State.Health}}' "${container}" 2>/dev/null || echo "no health check"`,
         `echo "--- Restart Count ---"`,
-        `docker inspect --format='{{.RestartCount}}' "${args.container}" 2>/dev/null`,
+        `docker inspect --format='{{.RestartCount}}' "${container}" 2>/dev/null`,
         `echo "--- Mounts ---"`,
-        `docker inspect --format='{{json .Mounts}}' "${args.container}" 2>/dev/null`,
+        `docker inspect --format='{{json .Mounts}}' "${container}" 2>/dev/null`,
         `echo "--- Published Ports ---"`,
-        `docker port "${args.container}" 2>/dev/null || echo "no published ports"`,
+        `docker port "${container}" 2>/dev/null || echo "no published ports"`,
         `echo "--- Logs (last 80 lines) ---"`,
-        `docker logs "${args.container}" --tail=80 2>/dev/null || echo "cannot get logs"`,
+        `docker logs "${container}" --tail=80 2>/dev/null || echo "cannot get logs"`,
       );
     }
 
