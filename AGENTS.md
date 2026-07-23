@@ -28,7 +28,7 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 | "auditá la seguridad" / "Lynis" / "vulnerabilidades" / "hardening" / "security audit" / "CIS" | **security-audit** |
 | "actualizaciones" / "paquetes" / "upgrade" / "atrasado" / "parches" / "patch" / "qué updates hay pendientes" | **patch-status** |
 | "proxy" / "nginx" / "apache" / "caddy" / "reverse proxy" / "no responde" / "502" / "504" / "bad gateway" / "gateway timeout" / "web server" | **proxy-debug** |
-| "relación" / "depende" / "conecta" / "relacioná" / "este host se conecta a" / dependencia entre hosts" | **memory-relation** |
+| "relación" / "depende" / "conecta" / "relacioná" / "este host se conecta a" / "dependencia entre hosts" | **memory-relation** |
 
 ## Flujo de trabajo
 
@@ -43,6 +43,7 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 5. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
    - Si no hay contexto TOON, caé a `./memoria/hosts/<host>.md` (legacy).
    - **Si `memory-stale host=<host>` detecta facts vencidos**, ejecutá automáticamente las tools necesarias (debug, recon, etc.) para refrescar los facts vencidos antes de continuar con el diagnóstico. No esperés a que el usuario lo pida.
+   - **Preguntale al usuario** si este host tiene relación con otros (dependencias, proxies, conexiones). Si confirma, ejecutá `memory-relation action=add from=<host> relation=<tipo> to=<otro-host>`.
 
 6. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.).
 
@@ -69,23 +70,19 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
     ```
 
 11. **Al finalizar, presentá un resumen estructurado:**
-   ```
-   ── Resumen: <host> ──
-   Estado: <ok / warning / critical>
-   Servicios relevantes: <lista>
-   Riesgos activos: <lista>
-   Facts refrescados: <lista>
-   Conflictos detectados: <lista>
-   Acciones recomendadas: <lista>
-   ```
+    ```
+    ── Resumen: <host> ──
+    Estado: <ok / warning / critical>
+    Servicios relevantes: <lista>
+    Riesgos activos: <lista>
+    Facts refrescados: <lista>
+    Conflictos detectados: <lista>
+    Acciones recomendadas: <lista>
+    ```
 
 ## Relaciones entre hosts
 
-Cuando estés diagnosticando un host, preguntale al usuario si ese host tiene relación con otros (ej: "este host depende de otro?", "a qué servidores proxy pasa tráfico?", "está conectado a tal base de datos?").
-
-Si el usuario confirma una relación, ejecutá **`memory-relation from=<host> relation=<tipo> to=<otro-host>`** para persistirla.
-
-Tipos de relación soportados:
+Tipos de relación soportados por `memory-relation`:
 - `proxiesa` — este host actúa como proxy de otro
 - `depende-de` — este host depende de otro (ej: app → database)
 - `conecta-a` — conexión de red directa
@@ -153,7 +150,7 @@ Podés ejecutar **múltiples tools** en una misma interacción si el pedido lo a
 
 | Pedido del usuario | Tools a ejecutar |
 |---|---|
-| "revisá el server X completo" | `self-check` + `memory-read-context` + `debug` + `recon` + `patch-status` (modo quick) |
+| "revisá el server X completo" | `memory-read-context` + `debug` + `recon` + `patch-status` (modo quick) |
 | "auditá seguridad + parches en X" | `security-audit` + `patch-status` |
 | "diagnóstico completo de red y proxy" | `network-debug` + `proxy-debug` |
 | "todo lo que sepas de X" | `memory-read-context` + todas las tools relevantes según el contexto |
