@@ -6,7 +6,7 @@ import { projectRoot } from "./_root";
 import { sanitizeParam } from "./_ssh";
 
 const SELF = "opencode-sync.ts";
-const TOOLS_PREFIX = "./.opencode/tools/";
+const TOOLS_PREFIX = "./.opencode/ts-tools/";
 
 export default tool({
   description:
@@ -69,7 +69,7 @@ export default tool({
     }
 
     lines.push("--- Scanning filesystem ---");
-    const toolDir = path.join(ROOT, ".opencode", "tools");
+    const toolDir = path.join(ROOT, ".opencode", "ts-tools");
     const skillDir = path.join(ROOT, ".opencode", "skills");
 
     const diskTools: string[] = [];

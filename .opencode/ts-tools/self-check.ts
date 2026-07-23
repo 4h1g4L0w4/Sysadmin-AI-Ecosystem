@@ -105,14 +105,14 @@ export default tool({
     // Tool files
     lines.push("");
     lines.push(`--- Tools (source files) ---`);
-    const toolDir = path.join(ROOT, ".opencode", "tools");
+    const toolDir = path.join(ROOT, ".opencode", "ts-tools");
     if (existsSync(toolDir)) {
       const tools = readdirSync(toolDir).filter((f) => f.endsWith(".ts") && !f.startsWith("_"));
       for (const t of tools.sort()) {
         lines.push(ok(t));
       }
     } else {
-      lines.push(fail(".opencode/tools/", "directory not found"));
+      lines.push(fail(".opencode/ts-tools/", "directory not found"));
     }
 
     // AGENTS.md
