@@ -53,20 +53,14 @@ Saltea la detección automática y apunta al proxy específico.
 
 ## Lo que guardar en memoria
 
-Después de ejecutar, actualizá `./memoria/hosts/<host>.md` con:
+Seguí el flujo canónico de `host-memory` (`memory-write` → TOON). **No escribas en `./memoria/hosts/<host>.md`** — ese archivo es legacy, solo fallback de lectura.
 
-```markdown
-## Proxy
-- Tipo: nginx / apache / caddy / ...
-- Versión:
-- Config: válida / rota (describir error)
-- Últimos errores: (resumen)
-```
+Observaciones sugeridas (`key` / `value`):
+- `proxy.type`, `proxy.version`, `proxy.config_valid`, `proxy.last_errors`
 
 ## Notas técnicas
 
 - Detección por binario + systemd is-active
 - `nginx -t` / `apache2ctl -t` validan sintaxis sin modificar
-- `apt-get -s dist-upgrade` es simulación — no instala nada
 - No requiere root para la mayoría de las operaciones
 - Si el proxy corre en Docker, usar `docker-debug` + `proxy-debug`

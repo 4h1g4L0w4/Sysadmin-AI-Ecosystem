@@ -48,12 +48,12 @@ Esto actualiza automáticamente:
 - `entities/hosts/<host>.toon` (estado consolidado)
 - `views/host-context/<host>.toon` (vista para IA)
 
-### 3. Si resolviste un problema
+### 3. Si resolviste un problema o aplicaste un cambio
 
-Registralo como incidente TOON con `memory-write`, usando key `incident.<id>` y value con descripción. Opcional: crear `events/incidents/<id>.toon` manualmente.
+Seguí los pasos 10 y 11 de `AGENTS.md`: registrá el cambio en `events/changes/<id>.toon` (schema `sysadmin.change.v1`) y/o el incidente en `events/incidents/<id>.toon` (schema `sysadmin.incident.v1`). No uses `memory-write` con key `incident.*` para esto — son mecanismos separados.
 
 ## Reglas
 - NO borrés memoria legacy Markdown.
-- **NUNCA guardar secretos, passwords, tokens ni IPs reales.** La redacción automática ayuda pero no es infalible.
+- Hostnames preferidos para entidades; si no hay hostname conocido, IPs son aceptables. **Nunca passwords, tokens ni secretos.** La redacción automática ayuda pero no es infalible.
 - Si `memory-*` falla, seguí usando las tools de diagnóstico normalmente y actualizá el Markdown legacy como antes.
 - No confiar en facts vencidos sin refrescarlos — corré `memory-stale host=<host>` primero.

@@ -13,7 +13,7 @@ Usá `security-audit` automáticamente cuando el usuario:
 - Pida una auditoría de seguridad ("auditá la seguridad", "hacé un security audit", "ejecutá Lynis")
 - Pida análisis de vulnerabilidades o hardening
 - Mencione "CIS benchmark", "hardening score", "lynis"
-- Reciba un servidor nuevo (después de `recon`)
+- Al terminar un `recon` de servidor nuevo, **recomendá** en el resumen correr `security-audit`, pero no lo ejecutes automáticamente — es una operación lenta (descarga y corre Lynis) que el usuario debería confirmar.
 
 ## Modos de operación
 
@@ -37,22 +37,14 @@ Devuelve el reporte Lynis completo (formato key=value). Usar si el usuario pide 
 | 41-60 | Bajo — mejoras importantes necesarias |
 | 61-70 | Aceptable — mejoras recomendadas |
 | 71-80 | Bueno — configuración sólida |
-| 81-100 | Excelente — hardering avanzado aplicado |
+| 81-100 | Excelente — hardening avanzado aplicado |
 
 ## Lo que guardar en memoria
 
-Después de ejecutar, actualizá `./memoria/hosts/<host>.md` con:
+Seguí el flujo canónico de `host-memory` (`memory-write` → TOON). **No escribas en `./memoria/hosts/<host>.md`** — ese archivo es legacy, solo fallback de lectura.
 
-```markdown
-## Security
-- Último audit: YYYY-MM-DD
-- Hardening Index: XX
-- Warnings: XX
-- Suggestions: XX
-- Hallazgos críticos: (resumen breve)
-```
-
-No dupliques entradas de auditorías previas; agregá una nueva fila con la fecha más reciente.
+Observaciones sugeridas (`key` / `value`):
+- `security.hardening_index`, `security.warnings_count`, `security.suggestions_count`, `security.critical_findings`
 
 ## Notas técnicas
 

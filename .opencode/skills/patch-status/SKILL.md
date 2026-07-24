@@ -46,15 +46,10 @@ Solo paquetes con actualización de seguridad.
 
 ## Lo que guardar en memoria
 
-Después de ejecutar, actualizá `./memoria/hosts/<host>.md` con:
+Seguí el flujo canónico de `host-memory` (`memory-write` → TOON). **No escribas en `./memoria/hosts/<host>.md`** — ese archivo es legacy, solo fallback de lectura.
 
-```markdown
-## Updates
-- Último check: YYYY-MM-DD
-- Updates totales: XX (security: XX)
-- Reboot required: YES/NO
-- Riesgo de upgrade: (ALTO/MEDIO/BAJO — resumen)
-```
+Observaciones sugeridas (`key` / `value`):
+- `patch.updates_total`, `patch.security_updates`, `patch.reboot_required`, `patch.upgrade_risk`
 
 ## Notas técnicas
 

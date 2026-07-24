@@ -25,7 +25,7 @@ Esta regla aplica a todas las tools (debug, recon, network-debug, ssl-check, doc
 
 ## Selección automática de tools
 
-El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta automáticamente según su mensaje:
+El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta según la **intención** del mensaje, no según coincidencia textual con la tabla — las frases de ejemplo son ilustrativas, no las únicas válidas. Si el mensaje combina varios síntomas (ej: "el nginx se cayó y no puedo entrar por SSH"), identificá cada síntoma por separado antes de elegir tool(s); no fuerces todo a una sola fila de la tabla.
 
 | Si el usuario dice... | Usá esta tool |
 |---|---|
@@ -54,12 +54,11 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
 3. **Host no especificado** → preguntá cuál es el servidor antes de actuar.
 
 4. **Host nuevo / desconocido** → corré `recon` primero para mapear el servidor.
-   - **Preguntale al usuario** si este host tiene relación con otros. Si confirma, ejecutá `memory-relation action=add from=<host> relation=<tipo> to=<otro-host>`.
+   - **Preguntale al usuario por relaciones con otros hosts solo si `entities/hosts/<host>.toon` no tiene ninguna relación registrada todavía.** Si ya tiene relaciones conocidas, no volvas a preguntar — mostralas como contexto y seguí. Si el usuario menciona una relación nueva espontáneamente, registrala igual aunque ya existan otras.
 
 5. **Host conocido** → corré `memory-read-context host=<host>` para leer el contexto TOON antes de diagnosticar.
    - Si no hay contexto TOON, caé a `./memoria/hosts/<host>.md` (legacy).
-   - **Si `memory-stale host=<host>` detecta facts vencidos**, ejecutá automáticamente las tools necesarias (debug, recon, etc.) para refrescar los facts vencidos antes de continuar. No esperés a que el usuario lo pida.
-   - **Preguntale al usuario** si este host tiene relación con otros. Si confirma, ejecutá `memory-relation action=add from=<host> relation=<tipo> to=<otro-host>`.
+   - **Si `memory-stale host=<host>` detecta facts vencidos**, refrescá automáticamente solo los facts relevantes para el pedido actual del usuario (no la totalidad de lo vencido). Si el pedido es puntual (ej: "¿corre redis?"), refrescá como máximo el fact directamente relacionado. Si el pedido es "revisá todo" o un diagnóstico completo, ahí sí refrescá todo lo vencido.
 
 6. **Problema concreto** → usá la tool específica (`debug`, `network-debug`, etc.). Si dos categorías describen una misma cadena causal (ej: "proxy tira 502 y el container backend no responde"), componé ambas tools aunque el usuario no pida "completo".
 
@@ -97,7 +96,11 @@ El usuario **nunca** debe especificar qué tool usar. Inferí la tool correcta a
       <detalles del diagnóstico>
     ```
 
-12. **Al finalizar el diagnóstico de este host, presentá un resumen estructurado:**
+12. **Al finalizar, presentá un resumen acorde a la complejidad del pedido:**
+
+    - **Pedido puntual, una sola tool, sin hallazgos relevantes** → respuesta corta en prosa, sin template. Ej: "redis está activo en web1, puerto 6379 abierto, sin errores recientes en el log."
+
+    - **Diagnóstico multi-tool o con hallazgos relevantes** → resumen estructurado completo:
     ```
     ── Resumen: <host> ──
     Estado: <ok / warning / critical>
@@ -152,6 +155,21 @@ memoria/
 - Usá `memory-conflicts` después de escribir para detectar contradicciones.
 - Si `memory-*` falla, las tools de diagnóstico siguen funcionando.
 
+## TTL de referencia por tipo de fact
+
+Al escribir observaciones, usá estos TTL como default salvo que el contexto indique algo distinto. Esto es lo que hace que `memory-stale` refresque lo que realmente cambia y no toque lo que no:
+
+| Tipo de fact | TTL sugerido | Ejemplos |
+|---|---|---|
+| Hardware / capacidad fija | 90+ días | cores de CPU, RAM total, modelo de disco |
+| Configuración estable | 14-30 días | versión de OS, paquetes instalados, config de proxy |
+| Estado de servicios | 1-3 días | servicio activo/inactivo, puertos abiertos |
+| Métricas de uso | horas (ej: 0.25-1 día) | uso de disco %, uso de memoria, carga |
+| Seguridad / hardening | 7 días | resultado de Lynis, CVEs pendientes |
+| Relaciones entre hosts | sin vencimiento (no aplica TTL) | proxiesa, depende-de, conecta-a |
+
+Si una tool nueva no está en esta lista, elegí el TTL por analogía con la fila más parecida y agregala acá.
+
 ## Prioridad de selección
 
 Cuando un mensaje mencione **múltiples** categorías, aplicá este orden de prioridad:
@@ -171,6 +189,8 @@ Ejemplos:
 - *"el server web1 está lento y tiene el disco lleno"* → **debug** (general), no patch-status
 - *"el server web1 tiene actualizaciones pendientes y problemas de red"* → **patch-status** (prioridad 2 sobre network-debug)
 - *"revisá el server X completo"* → podés **componer**: debug + recon + patch-status en paralelo
+
+**Regla general de composición:** la tabla de prioridad define el **orden de presentación**, no cuáles tools correr. Si el mensaje nombra más de un síntoma concreto (sea cual sea la cantidad de categorías involucradas), componé una tool por cada síntoma nombrado. Usá la prioridad únicamente para decidir qué resultado liderar en el resumen final — nunca para descartar diagnósticos que el usuario pidió explícita o implícitamente.
 
 ## Composición de tools
 
